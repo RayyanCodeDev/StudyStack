@@ -275,7 +275,7 @@ def login_page():
                 st.session_state.auth_mode = "guest"
                 st.rerun()
             st.caption("Guest mode needs no email or name. Nothing is saved on our side, and guests don't appear on leaderboards.")
-
+            st.caption("🔒 Don't upload IDs, passwords or private chats. Images are sent to Google's Gemini AI to be analyzed.")
 
 if st.session_state.auth_mode is None:
     login_page()
