@@ -10,6 +10,38 @@ def _s(v, n=20000):
     return str(v)[:n] if v is not None else ""
 
 
+SUBJECT_ALIASES = {
+    "math": "Mathematics", "maths": "Mathematics", "mathematics": "Mathematics",
+    "physics": "Physics", "chemistry": "Chemistry", "biology": "Biology",
+    "cs": "Computer Science", "computer science": "Computer Science",
+    "computing": "Computer Science", "computer studies": "Computer Science",
+    "english": "English", "english language": "English", "urdu": "Urdu",
+    "islamiat": "Islamiat", "islamiyat": "Islamiat", "islamic studies": "Islamiat",
+    "pakistan studies": "Pakistan Studies", "pak studies": "Pakistan Studies",
+    "history": "History", "geography": "Geography", "science": "Science",
+    "general science": "Science", "economics": "Economics",
+    "business studies": "Business Studies", "accounting": "Accounting",
+}
+
+
+def normalize_subject(value):
+    """Keep equivalent AI subject labels together, including older saved sets."""
+    name = " ".join(_s(value, 100).split())
+    key = name.casefold()
+    if key in ("", "none", "null", "unknown", "n/a", "uncategorized"):
+        return "Uncategorized"
+    return SUBJECT_ALIASES.get(key, name.title())
+
+
+def group_sets_by_subject(rows):
+    """Sort subject tabs alphabetically while keeping newest-first set order."""
+    groups = {}
+    for row in rows:
+        subject = normalize_subject(row.get("subject"))
+        groups.setdefault(subject, []).append(row)
+    return dict(sorted(groups.items(), key=lambda item: (item[0] == "Uncategorized", item[0].casefold())))
+
+
 def clean_chat(chat):
     out = []
     if isinstance(chat, list):
@@ -30,7 +62,7 @@ def clean_result(r):
     cards = r.get("flashcards")
     rels = r.get("relationships")
     return {
-        "subject": _s(r.get("subject"), 100),
+        "subject": normalize_subject(r.get("subject")),
         "topic": _s(r.get("topic"), 200),
         "summary": _s(r.get("summary"), 3000),
         "detailed_notes": _s(notes, 30000),
@@ -60,7 +92,7 @@ def save_set(result, chat):
     if len(rows) >= MAX_SETS:
         return None, f"Your library is full ({MAX_SETS} sets). Delete an old set to save new ones."
     title = _s(result.get("topic"), 120).strip() or "Untitled"
-    subject = _s(result.get("subject"), 60).strip() or None
+    subject = normalize_subject(result.get("subject"))
     try:
         r = db().table("study_sets").insert(
             {"title": title, "subject": subject, "result": result, "chat": clean_chat(chat)}
@@ -98,3 +130,4 @@ def delete_set(set_id):
         return None
     except Exception:
         return "Couldn't delete that set. Please try again."
+

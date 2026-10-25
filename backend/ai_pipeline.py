@@ -65,6 +65,12 @@ Read the screenshot and return ONLY valid JSON with exactly these keys:
   "raw_text": "The exact text extracted from the image",
   "flashcards": [{"front": "Question", "back": "Answer"}]
 }
+Rules for "subject": classify the content automatically into ONE broad school subject, not a topic
+or chapter. Use a consistent name such as Mathematics, Physics, Chemistry, Biology, Computer Science,
+English, Urdu, Islamiat, Pakistan Studies, History, Geography, Science, Economics, Business Studies,
+or Accounting. Use another short subject name when appropriate. For mixed material, choose the dominant
+subject; use General Studies if no subject dominates. Use Uncategorized only if the subject cannot be
+identified. Never leave subject blank.
 Rules for "relationships": use ONLY names copied exactly from key_concepts, and give 3 to 8 links
 showing how the concepts relate to each other (not to the topic).
 """
@@ -175,3 +181,4 @@ How to answer:
    Use short paragraphs, and bullet points only when they genuinely help.
 7. Be warm, clear and encouraging. If you are not sure about a fact, say so instead of guessing.
 8. Reply in the language the student wrote in.""")
+
