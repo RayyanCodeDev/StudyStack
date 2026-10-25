@@ -14,7 +14,7 @@ from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_w
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
-                             load_set, save_set, update_chat)
+                             load_set, save_set, update_chat, group_sets_by_subject)
 from backend.social import DAILY_CAP, award as award_points, fetch_social, remove_friend, respond_request, send_request
 
 BASE_DIR = Path(__file__).parent
@@ -617,33 +617,37 @@ with tab_lib:
                 st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here automatically.")
             else:
                 st.caption(f"{len(lib['rows'])} of {MAX_SETS} sets saved. To study a set, press Open, then use the other tabs.")
-                for row in lib["rows"]:
-                    c1, c2, c3, c4 = st.columns([5, 2, 1.3, 1.3])
-                    subject = f"  \n{row['subject']}" if row.get("subject") else ""
-                    c1.markdown(f"**{row['title']}**{subject}")
-                    c2.caption(str(row["created_at"])[:10])
-                    if c3.button("Open", key=f"open_{row['id']}"):
-                        open_saved(row["id"])
-                    if c4.button("Delete", key=f"del_{row['id']}"):
-                        st.session_state.confirm_delete = row["id"]
-                        st.rerun()
-
-                    if st.session_state.confirm_delete == row["id"]:
-                        st.warning(f"Delete “{row['title']}”? This can't be undone.")
-                        y, n, _ = st.columns([1.3, 1, 4])
-                        if y.button("Yes, delete", key=f"yes_{row['id']}"):
-                            err = delete_set(row["id"])
-                            if err:
-                                st.error(err)
-                            else:
-                                if st.session_state.current_set_id == row["id"]:
-                                    st.session_state.current_set_id = None
-                                st.session_state.confirm_delete = None
-                                st.session_state.lib_cache = None
+                st.caption("Your notes are automatically organized by the subject identified by AI.")
+                subject_groups = group_sets_by_subject(lib["rows"])
+                subject_tabs = st.tabs(list(subject_groups))
+                for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
+                    with subject_tab:
+                        for row in subject_rows:
+                            c1, c2, c3, c4 = st.columns([5, 2, 1.3, 1.3])
+                            c1.markdown(f"**{row['title']}**")
+                            c2.caption(str(row["created_at"])[:10])
+                            if c3.button("Open", key=f"open_{row['id']}"):
+                                open_saved(row["id"])
+                            if c4.button("Delete", key=f"del_{row['id']}"):
+                                st.session_state.confirm_delete = row["id"]
                                 st.rerun()
-                        if n.button("Cancel", key=f"no_{row['id']}"):
-                            st.session_state.confirm_delete = None
-                            st.rerun()
+
+                            if st.session_state.confirm_delete == row["id"]:
+                                st.warning(f"Delete “{row['title']}”? This can't be undone.")
+                                y, n, _ = st.columns([1.3, 1, 4])
+                                if y.button("Yes, delete", key=f"yes_{row['id']}"):
+                                    err = delete_set(row["id"])
+                                    if err:
+                                        st.error(err)
+                                    else:
+                                        if st.session_state.current_set_id == row["id"]:
+                                            st.session_state.current_set_id = None
+                                        st.session_state.confirm_delete = None
+                                        st.session_state.lib_cache = None
+                                        st.rerun()
+                                if n.button("Cancel", key=f"no_{row['id']}"):
+                                    st.session_state.confirm_delete = None
+                                    st.rerun()
         else:
             st.write("As a guest, nothing is stored on our side. Download your study set to keep it, and upload it here later to continue.")
 
@@ -1003,3 +1007,4 @@ with tab_focus:
             st.success("🎉 Daily study goal reached! Amazing work.")
         else:
             st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
+
