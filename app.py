@@ -219,7 +219,9 @@ def login_page():
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
         with card("login"):
-            show_logo(LOGO_LOGIN, 240, "## 📚 StudyStack")
+            _l, _c, _r = st.columns([1, 2.4, 1])
+            with _c:
+                show_logo(LOGO_LOGIN, 240, "## 📚 StudyStack")
             st.caption("Sign in to keep your progress, or try the app as a guest.")
 
             if not auth_configured():
