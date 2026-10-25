@@ -877,7 +877,7 @@ with tab_chat:
 
         with card("chat"):
             st.header("AI Tutor & Voice Hub")
-
+            st.caption("🤖 AI can make mistakes. Double-check important facts, especially before exams.")
             # Step 1: ask the student's name (skipped for signed-in users, who already have one)
             if not st.session_state.name_asked:
                 with st.chat_message("assistant"):
