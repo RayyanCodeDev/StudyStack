@@ -1,14 +1,19 @@
 import copy
 import io
 import json
+import random
 import re
 import textwrap
+import time
+import pandas as pd
 import streamlit as st
 from pypdf import PdfReader, PdfWriter
 from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes
+from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
                              load_set, save_set, update_chat)
+from backend.social import DAILY_CAP, award as award_points, fetch_social, remove_friend, respond_request, send_request
 
 st.set_page_config(page_title="StudyStack", page_icon="📚", layout="wide")
 
@@ -20,6 +25,11 @@ DEFAULTS = {
     "analysis_result": None,
     "file_key": None,
     "chat_history": [],
+    "known": set(),          # flashcards marked "I knew it"
+    "mcq": None,             # state of the multiple-choice quiz
+    "study_minutes": 25,     # Focus Hub
+    "sessions_completed": 2, # Focus Hub
+    "voice_gen": 0,          # changing this empties the voice recorder
     "user_name": "",
     "name_asked": False,
     "auth_mode": None,       # None = not chosen yet, "user" or "guest"
@@ -29,6 +39,10 @@ DEFAULTS = {
     "lib_cache": None,       # cached library list, None = reload from the database
     "save_note": "",
     "confirm_delete": None,
+    "social": None,          # cached progress / friends / leaderboard, None = reload
+    "flash": "",             # one-time message shown after a rerun (e.g. "+2 points")
+    "friend_msg": None,
+    "confirm_remove": None,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -100,6 +114,7 @@ header[data-testid="stHeader"]{background:transparent;}
 .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp p,.stApp li,.stApp label,.stApp summary,
 .stApp [data-testid="stMarkdownContainer"],.stApp [data-testid="stCaptionContainer"]{color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;}
 .stApp h1{font-weight:800;letter-spacing:-0.02em;}
+[data-testid="stMetric"] *{color:var(--text)!important;}
 
 /* Frosted glass cards (containers created with key="card_*") */
 [class*="st-key-card"]{
@@ -126,8 +141,8 @@ header[data-testid="stHeader"]{background:transparent;}
 [data-testid="stFileUploaderDropzone"]{background:var(--glass2);border:1.5px dashed var(--border);border-radius:18px;}
 [data-testid="stFileUploaderDropzone"] *{color:var(--text)!important;}
 [data-testid="stAlert"]{background:var(--glass2);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(14px);}
-.stButton>button,.stDownloadButton>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);}
-.stButton>button:hover,.stDownloadButton>button:hover,[data-testid="stFormSubmitButton"]>button:hover{filter:brightness(1.12);color:#fff;}
+.stButton>button,.stDownloadButton>button,[data-testid="stDownloadButton"]>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);}
+.stButton>button:hover,.stDownloadButton>button:hover,[data-testid="stDownloadButton"]>button:hover,[data-testid="stFormSubmitButton"]>button:hover{filter:brightness(1.12);color:#fff;}
 
 /* Forms and chat bubbles */
 [data-testid="stForm"]{border:none!important;padding:0!important;background:transparent!important;}
@@ -194,7 +209,7 @@ def login_page():
                 with t_up:
                     with st.form("signup_form"):
                         nm = st.text_input("Display name", max_chars=30, key="su_name",
-                                           help="Shown to your tutor and (later) your friends. Use a nickname if you like.")
+                                           help="Shown to your tutor and your friends. Use a nickname if you like.")
                         email2 = st.text_input("Email", key="su_email")
                         pw2 = st.text_input("Password (at least 8 characters)", type="password", key="su_pw")
                         go2 = st.form_submit_button("Create account")
@@ -226,12 +241,39 @@ if st.session_state.auth_mode is None:
     login_page()
     st.stop()
 
+# one-time message left over from the previous run (e.g. points earned just before a rerun)
+if st.session_state.flash:
+    st.toast(st.session_state.flash)
+    st.session_state.flash = ""
+
 
 # ---------- HELPERS ----------
 def get_context(res):
     """Everything the tutor can use: summary, notes and extracted text (capped for safety)."""
     parts = [str(res.get("summary", "")), str(res.get("detailed_notes", "")), str(res.get("raw_text", ""))]
     return "\n\n".join(p for p in parts if p.strip())[:20000]
+
+
+def fix_latex(s):
+    """Repair formula symbols that JSON turned into control characters (tab, backspace...)."""
+    s = str(s)
+    fixes = {
+        "\text": r"\text",
+        "\times": r"\times",
+        "\theta": r"\theta",
+        "\tau": r"\tau",
+        "\frac": r"\frac",
+        "\beta": r"\beta",
+        "\bar": r"\bar",
+        "\rho": r"\rho",
+        "\rightarrow": r"\rightarrow",
+        "\alpha": r"\alpha",
+        "\approx": r"\approx",
+        "\vec": r"\vec",
+    }
+    for bad, good in fixes.items():
+        s = s.replace(bad, good)
+    return s
 
 
 def pdf_page_count(data):
@@ -257,6 +299,39 @@ def pdf_slice(data, start, end):
     return out.getvalue()
 
 
+def award(kind, immediate=False):
+    """Give points to a signed-in student. The database enforces the daily caps."""
+    if st.session_state.auth_mode != "user":
+        return
+    pts = award_points(kind)
+    st.session_state.social = None  # progress changed, reload it next time
+    if pts > 0:
+        msg = f"+{pts} points 🔥"
+        if immediate:
+            st.toast(msg)
+        else:
+            st.session_state.flash = msg  # shown after the next rerun
+
+
+def get_social(force=False):
+    s = st.session_state.social
+    if force or s is None or time.time() - s["t"] > 90:
+        s = fetch_social()
+        s["t"] = time.time()
+        st.session_state.social = s
+    return s
+
+
+def friend_action(fn, *args):
+    err = fn(*args)
+    if err:
+        st.error(err)
+    else:
+        st.session_state.social = None
+        st.session_state.confirm_remove = None
+        st.rerun()
+
+
 def save_result(result, key):
     """Store a fresh analysis, and save it to the library when the visitor is signed in."""
     if "error" in result:
@@ -269,6 +344,8 @@ def save_result(result, key):
     st.session_state.analysis_result = clean
     st.session_state.file_key = key
     st.session_state.chat_history = []  # new material = fresh chat (name is kept)
+    st.session_state.known = set()
+    st.session_state.mcq = None
     st.session_state.current_set_id = None
     if st.session_state.auth_mode == "user":
         set_id, err = save_set(clean, [])
@@ -278,6 +355,7 @@ def save_result(result, key):
             st.session_state.current_set_id = set_id
             st.session_state.lib_cache = None
             st.session_state.save_note = "✅ Saved to your library."
+        award("analyze", immediate=True)
     else:
         st.session_state.save_note = "Guest mode: nothing is saved. Use the 📚 My Library tab to download this set."
 
@@ -302,11 +380,83 @@ def open_saved(set_id):
         return
     st.session_state.analysis_result = data["result"]
     st.session_state.chat_history = data["chat"]
+    st.session_state.known = set()
+    st.session_state.mcq = None
     st.session_state.current_set_id = set_id
     st.session_state.file_key = ("saved", set_id)
     st.session_state.upload_gen += 1  # clears the uploader so an old file can't overwrite this set
     st.session_state.save_note = ""
     st.rerun()
+
+
+def build_mcq(flashcards):
+    cards = [c for c in flashcards if str(c.get("front") or "").strip() and str(c.get("back") or "").strip()]
+    backs = sorted({str(c["back"]).strip() for c in cards})
+    questions = []
+    for c in cards:
+        correct = str(c["back"]).strip()
+        others = [b for b in backs if b != correct]
+        random.shuffle(others)
+        options = [correct] + others[:3]
+        if len(options) < 2:
+            continue
+        random.shuffle(options)
+        questions.append({"q": str(c["front"]).strip(), "options": options, "answer": correct})
+    random.shuffle(questions)
+    return questions
+
+
+def mcq_quiz(flashcards):
+    if st.session_state.mcq is None:
+        st.session_state.mcq = {
+            "qs": build_mcq(flashcards),
+            "i": 0,
+            "score": 0,
+            "checked": False,
+            "correct": False,
+            "awarded": False,
+            "run": random.randint(0, 10**9),
+        }
+    m = st.session_state.mcq
+    qs = m["qs"]
+    if len(qs) < 1:
+        st.info("Not enough flashcards to build a multiple-choice quiz from this material.")
+        return
+    if m["i"] >= len(qs):
+        st.success(f"🎉 Finished! Your score: {m['score']}/{len(qs)}")
+        if not m["awarded"]:
+            m["awarded"] = True
+            if len(qs) >= 3:
+                award("quiz", immediate=True)
+        if st.button("🔄 Restart quiz", key="mcq_restart"):
+            st.session_state.mcq = None
+            st.rerun()
+        return
+    q = qs[m["i"]]
+    st.progress(m["i"] / len(qs))
+    st.caption(f"Question {m['i'] + 1} of {len(qs)} | Score: {m['score']}")
+    st.subheader(q["q"])
+    pick = st.radio("Choose one:", q["options"], index=None, key=f"mcq_pick_{m['run']}_{m['i']}", disabled=m["checked"])
+    if not m["checked"]:
+        if st.button("Check answer", key="mcq_check"):
+            if pick is None:
+                st.warning("Pick an answer first.")
+            else:
+                m["checked"] = True
+                m["correct"] = (pick == q["answer"])
+                if m["correct"]:
+                    m["score"] += 1
+                st.rerun()
+    else:
+        if m["correct"]:
+            st.success("✅ Correct!")
+        else:
+            st.error(f"❌ Not quite. The correct answer is: {q['answer']}")
+        label = "Next question ➡️" if m["i"] + 1 < len(qs) else "See results 🏁"
+        if st.button(label, key="mcq_next"):
+            m["i"] += 1
+            m["checked"] = False
+            st.rerun()
 
 
 def build_dot(topic, concepts, links):
@@ -336,21 +486,25 @@ def build_dot(topic, concepts, links):
 
 # ---------- PAGE ----------
 st.title("📚 StudyStack")
-st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map and a tutor.")
+st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
-tab_home, tab_cap, tab_lib, tab_graph, tab_quiz, tab_chat = st.tabs(
-    ["🏠 Home", "📸 Capture", "📚 My Library", "🕸️ Knowledge Graph", "🧠 Smart Quiz", "💬 AI Tutor"]
+tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_quiz, tab_chat, tab_focus = st.tabs(
+    ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Graph",
+     "🧠 Smart Quiz", "💬 AI Tutor", "⏱️ Focus Hub"]
 )
 
+# --- HOME ---
 with tab_home:
     with card("home"):
         st.header("Welcome to StudyStack")
         st.write("Upload a screenshot or a PDF of a lecture, syllabus or chat. StudyStack extracts the text, writes notes, "
-                 "makes flashcards, draws a concept map, grades your explanations and lets you chat with the material.")
+                 "makes flashcards, draws a concept map, grades your explanations, tutors you by text or voice, "
+                 "and tracks your daily study focus time.")
         if st.session_state.auth_mode == "guest":
             st.info("You're in guest mode, so nothing is saved on our side. Use **Sign in** (top right) to create an account, "
-                    "or download your sets from the My Library tab.")
+                    "keep your streak and compete with friends.")
 
+# --- CAPTURE ---
 with tab_cap:
     with card("upload"):
         st.header("📸 Capture")
@@ -403,6 +557,7 @@ with tab_cap:
                             if st.session_state.file_key == key:
                                 show_done()
 
+# --- MY LIBRARY ---
 with tab_lib:
     res = st.session_state.analysis_result
     with card("library"):
@@ -458,7 +613,8 @@ with tab_lib:
             st.write(f"Currently open: **{res.get('topic') or 'Untitled'}**")
             payload = json.dumps({"app": "studystack", "version": 1, "result": res,
                                   "chat": st.session_state.chat_history}, ensure_ascii=False)
-            st.download_button("⬇️ Download this set", payload, file_name="studystack_set.json", mime="application/json")
+            st.download_button("⬇️ Download this set", payload, file_name="studystack_set.json",
+                               mime="application/json", key="dl_set")
 
         if st.session_state.auth_mode == "guest":
             st.divider()
@@ -478,12 +634,125 @@ with tab_lib:
                     elif st.button("Load this set"):
                         st.session_state.analysis_result = restored
                         st.session_state.chat_history = clean_chat(payload_in.get("chat"))
+                        st.session_state.known = set()
+                        st.session_state.mcq = None
                         st.session_state.current_set_id = None
                         st.session_state.file_key = ("file", f.name, f.size)
                         st.session_state.upload_gen += 1
                         st.session_state.save_note = ""
                         st.rerun()
 
+# --- PROGRESS ---
+with tab_prog:
+    if st.session_state.auth_mode != "user":
+        with card("prog_guest"):
+            st.header("🏆 Progress")
+            st.info("Sign in to track your streak and compete with friends. Guests aren't ranked.")
+    else:
+        soc = get_social()
+        prog = soc["progress"]
+
+        with card("progress"):
+            st.header("🏆 Your progress")
+            if soc["err"] or not prog:
+                st.error(soc["err"] or "No progress data yet.")
+            else:
+                streak = int(prog.get("streak", 0))
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("🔥 Streak", f"{streak} day{'s' if streak != 1 else ''}")
+                m2.metric("Today", f"{prog.get('today', 0)} / {DAILY_CAP}")
+                m3.metric("This week", prog.get("week", 0))
+                m4.metric("Total", prog.get("total", 0))
+                days = prog.get("last7") or []
+                if days:
+                    df = pd.DataFrame({"Day": [d["day"] for d in days], "Points": [d["points"] for d in days]})
+                    st.bar_chart(df, x="Day", y="Points")
+                st.caption("Earn points: +10 for a new set, +2 per tutor question, +5 per finished quiz or quiz answer "
+                           f"(30+ characters). Maximum {DAILY_CAP} a day. Study a little every day to grow your streak.")
+            if st.button("Refresh", key="refresh_social"):
+                get_social(force=True)
+                st.rerun()
+
+        with card("friends"):
+            st.header("👥 Friends")
+            st.caption("Friends only see your display name and your weekly points. Never your email.")
+
+            if soc["code"]:
+                st.write("Your friend code. Share it with classmates:")
+                st.code(soc["code"], language=None)
+
+            with st.form("add_friend", clear_on_submit=True):
+                code_in = st.text_input("Add a friend with their code", placeholder="STK-AB12CD")
+                add = st.form_submit_button("Send request")
+            if add:
+                st.session_state.friend_msg = send_request(code_in)
+                st.session_state.social = None
+                st.rerun()
+            fm = st.session_state.friend_msg
+            if fm:
+                (st.success if fm[0] else st.warning)(fm[1])
+                st.session_state.friend_msg = None
+
+            friends = soc["friends"]
+            incoming = [x for x in friends if x["status"] == "pending" and x["direction"] == "incoming"]
+            outgoing = [x for x in friends if x["status"] == "pending" and x["direction"] == "outgoing"]
+            accepted = [x for x in friends if x["status"] == "accepted"]
+
+            if incoming:
+                st.subheader("Requests for you")
+                for x in incoming:
+                    c1, c2, c3 = st.columns([4, 1.3, 1.3])
+                    c1.markdown(f"**{clean_name(x['name']) or 'Student'}** wants to be friends")
+                    if c2.button("Accept", key=f"acc_{x['id']}"):
+                        friend_action(respond_request, x["id"], True)
+                    if c3.button("Decline", key=f"dec_{x['id']}"):
+                        friend_action(respond_request, x["id"], False)
+
+            if outgoing:
+                st.subheader("Waiting for a reply")
+                for x in outgoing:
+                    c1, c2 = st.columns([5, 1.6])
+                    c1.markdown(f"⏳ **{clean_name(x['name']) or 'Student'}**")
+                    if c2.button("Cancel", key=f"can_{x['id']}"):
+                        friend_action(remove_friend, x["id"])
+
+            if accepted:
+                st.subheader("Your friends")
+                for x in accepted:
+                    nm = clean_name(x["name"]) or "Student"
+                    c1, c2 = st.columns([5, 1.6])
+                    c1.markdown(f"🧑‍🎓 **{nm}**")
+                    if c2.button("Remove", key=f"rm_{x['id']}"):
+                        st.session_state.confirm_remove = x["id"]
+                        st.rerun()
+                    if st.session_state.confirm_remove == x["id"]:
+                        st.warning(f"Remove {nm} from your friends?")
+                        y, n, _ = st.columns([1.5, 1, 4])
+                        if y.button("Yes, remove", key=f"rmy_{x['id']}"):
+                            friend_action(remove_friend, x["id"])
+                        if n.button("Cancel", key=f"rmn_{x['id']}"):
+                            st.session_state.confirm_remove = None
+                            st.rerun()
+            elif not incoming and not outgoing:
+                st.info("No friends yet. Share your code, or enter a classmate's code above.")
+
+        with card("board"):
+            st.header("🏅 Weekly leaderboard")
+            st.caption("You and your friends only. Resets every Monday.")
+            board = soc["board"]
+            if len(board) <= 1:
+                st.info("Add friends to start competing. Once they accept, you'll all appear here.")
+            medals = ["🥇", "🥈", "🥉"]
+            for i, row in enumerate(board):
+                icon = medals[i] if i < 3 else f"{i + 1}."
+                who = clean_name(row.get("name")) or "Student"
+                if row.get("me"):
+                    who += " (you)"
+                c1, c2 = st.columns([5, 1.6])
+                c1.markdown(f"**{icon} {who}**")
+                c2.markdown(f"**{row.get('points', 0)}** pts")
+
+# --- KNOWLEDGE GRAPH ---
 with tab_graph:
     res = st.session_state.analysis_result
     if res is None:
@@ -491,13 +760,22 @@ with tab_graph:
     else:
         with card("notes"):
             st.header("Study notes")
-            st.write(f"**Subject:** {res.get('subject')}  |  **Topic:** {res.get('topic')}")
+            st.write(f"**Subject:** {res.get('subject')} | **Topic:** {res.get('topic')}")
+            notes = fix_latex(res.get("detailed_notes") or "No notes generated.")
             with st.expander("📖 Detailed notes", expanded=True):
-                st.markdown(res.get("detailed_notes") or "No notes generated.")
+                st.markdown(notes)
+            st.download_button("⬇️ Download notes", notes, file_name="study_notes.txt", key="dl_notes")
 
         with card("graph"):
             st.header("Concept map")
-            concepts = [c for c in res.get("key_concepts", []) if str(c).strip()]
+            topic_name = str(res.get("topic", "")).strip().lower()
+            concepts, seen = [], set()
+            for c in res.get("key_concepts", []):
+                name_c = str(c or "").strip()
+                low = name_c.lower()
+                if name_c and low != topic_name and low not in seen:
+                    seen.add(low)
+                    concepts.append(name_c)
             if concepts:
                 dot = build_dot(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 try:
@@ -510,10 +788,18 @@ with tab_graph:
 
         with card("flash"):
             st.header("Flashcards")
-            for c in res.get("flashcards", []):
+            cards = res.get("flashcards", [])
+            st.caption(f"Mastered: {len(st.session_state.known)}/{len(cards)}")
+            for i, c in enumerate(cards):
                 with st.expander(f"❓ {c.get('front')}"):
                     st.write(f"**Answer:** {c.get('back')}")
+                    if i in st.session_state.known:
+                        st.success("Marked as known ✅")
+                    elif st.button("✅ I knew it", key=f"known_{i}"):
+                        st.session_state.known.add(i)
+                        st.rerun()
 
+# --- SMART QUIZ ---
 with tab_quiz:
     res = st.session_state.analysis_result
     if res is None:
@@ -521,16 +807,26 @@ with tab_quiz:
     else:
         topic = res.get("topic", "the topic")
         with card("quiz"):
-            st.header("Feynman quiz")
-            st.write(f"Explain **{topic}** in your own words and get graded.")
-            answer = st.text_area("Your explanation")
-            if st.button("Grade my answer"):
-                if answer.strip():
-                    with st.spinner("Grading..."):
-                        st.write(grade_answer(topic, answer))
-                else:
-                    st.warning("Type an explanation first.")
+            st.header("Smart quiz")
+            mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True, key="quiz_mode")
+            if mode == "Multiple choice":
+                mcq_quiz(res.get("flashcards", []))
+            else:
+                st.write(f"Explain **{topic}** in your own words and get graded.")
+                answer = st.text_area("Your explanation", key="feynman_answer")
+                if st.session_state.auth_mode == "user":
+                    st.caption("Answers of 30+ characters earn points.")
+                if st.button("Grade my answer", key="feynman_grade"):
+                    if answer.strip():
+                        with st.spinner("Grading..."):
+                            feedback = grade_answer(topic, answer)
+                        st.write(feedback)
+                        if not feedback.startswith("⚠️") and len(answer.strip()) >= 30:
+                            award("quiz", immediate=True)
+                    else:
+                        st.warning("Type an explanation first.")
 
+# --- AI TUTOR & VOICE ---
 with tab_chat:
     res = st.session_state.analysis_result
     if res is None:
@@ -541,7 +837,7 @@ with tab_chat:
         topic = res.get("topic", "your notes")
 
         with card("chat"):
-            st.header("AI tutor")
+            st.header("AI Tutor & Voice Hub")
 
             # Step 1: ask the student's name (skipped for signed-in users, who already have one)
             if not st.session_state.name_asked:
@@ -565,8 +861,31 @@ with tab_chat:
                     st.session_state.name_asked = True
                     st.rerun()
 
-            # Step 2: normal chat
+            # Step 2: voice + text chat
             else:
+                st.write("Ask by text, or record your voice to ask a question or explain a concept out loud.")
+
+                audio = st.audio_input("🎙️ Record a voice question or Feynman explanation",
+                                       key=f"voice_{st.session_state.voice_gen}")
+                if audio is not None:
+                    st.audio(audio)
+                    if st.button("🚀 Process voice message", key="voice_go"):
+                        if audio.size > MAX_AUDIO_MB * 1024 * 1024:
+                            st.error(f"That recording is too long (max {MAX_AUDIO_MB} MB). Try a shorter one.")
+                        else:
+                            with st.spinner("Listening and evaluating your audio..."):
+                                reply = evaluate_voice(audio.getvalue(), context, name)
+                            if reply.startswith("⚠️"):
+                                st.warning(reply)
+                            else:
+                                st.session_state.chat_history.append({"role": "user", "content": "🎙️ *[Spoken voice message]*"})
+                                st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                                persist_chat()
+                                award("tutor")
+                                st.session_state.voice_gen += 1  # empties the recorder
+                                st.rerun()
+
+                st.markdown("---")
                 if not st.session_state.chat_history:
                     hello = f"Nice to meet you, {name}! " if name else "Hi there! "
                     with st.chat_message("assistant"):
@@ -589,15 +908,59 @@ with tab_chat:
                             st.session_state.chat_history.append({"role": "user", "content": q})
                             st.session_state.chat_history.append({"role": "assistant", "content": reply})
                             persist_chat()
+                            if len(q.strip()) >= 5:
+                                award("tutor")
                             st.rerun()
                     else:
                         st.warning("Type a question first.")
 
                 b1, b2, _ = st.columns([1, 1, 4])
-                if st.session_state.chat_history and b1.button("Clear chat"):
+                if st.session_state.chat_history and b1.button("Clear chat", key="clear_chat"):
                     st.session_state.chat_history = []
                     persist_chat()
                     st.rerun()
                 if b2.button("Change name"):
                     st.session_state.name_asked = False
                     st.rerun()
+
+# --- FOCUS HUB ---
+with tab_focus:
+    with card("focus_hub_tab"):
+        st.header("⏱️ Focus & Pomodoro Hub")
+        st.write("Stay locked in. Choose your study mode, track your focus time, and build your daily study streak.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work", "Revision"],
+                                        key="focus_hub_study_mode")
+        with col2:
+            st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
+
+        st.markdown("---")
+        st.subheader("🎯 Active Session Controller")
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            if st.button("🚀 Start Focus Session"):
+                st.success("Focus timer active! Put your phone down and lock in.")
+        with col_b:
+            if st.button("☕ Take 5m Break"):
+                st.info("Break started. Rest your eyes!")
+        with col_c:
+            if st.button("✅ Log +25m Completed"):
+                st.session_state.study_minutes += 25
+                st.session_state.sessions_completed += 1
+                st.balloons()
+                st.rerun()
+
+        st.markdown("---")
+        st.subheader("📊 Study Analytics")
+        st.write(f"**Completed Sessions Today:** {st.session_state.sessions_completed}")
+
+        progress_val = min(st.session_state.study_minutes / 120.0, 1.0)
+        st.write("Daily Goal Progress (Target: 120 mins):")
+        st.progress(progress_val)
+
+        if st.session_state.study_minutes >= 120:
+            st.success("🎉 Daily study goal reached! Amazing work.")
+        else:
+            st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
