@@ -5,8 +5,10 @@ import random
 import re
 import textwrap
 import time
+from pathlib import Path
 import pandas as pd
 import streamlit as st
+from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
@@ -15,7 +17,20 @@ from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, lis
                              load_set, save_set, update_chat)
 from backend.social import DAILY_CAP, award as award_points, fetch_social, remove_friend, respond_request, send_request
 
-st.set_page_config(page_title="StudyStack", page_icon="📚", layout="wide")
+BASE_DIR = Path(__file__).parent
+LOGO_HEADER = BASE_DIR / "studystack_logo_header.png"
+LOGO_LOGIN = BASE_DIR / "studystack_logo_login.png"
+FAVICON = BASE_DIR / "studystack_favicon.png"
+
+
+def load_icon():
+    try:
+        return Image.open(FAVICON)
+    except Exception:
+        return "📚"
+
+
+st.set_page_config(page_title="StudyStack", page_icon=load_icon(), layout="wide")
 
 MAX_PDF_MB = 20
 MAX_PDF_PAGES = 30  # pages analyzed at once (keeps results good and free-tier usage low)
@@ -62,24 +77,41 @@ def reset_session():
     st.session_state.upload_gen = gen
 
 
-# ---------- THEME + TOP BAR ----------
-_, who_col, toggle_col = st.columns([5, 3, 1])
-with toggle_col:
-    dark = st.toggle("Dark mode", value=True)
-with who_col:
-    if st.session_state.auth_mode:
-        a, b = st.columns([2, 1])
-        if st.session_state.auth_mode == "user":
-            a.markdown(f"👤 **{clean_name(st.session_state.auth_user['name'])}**")
-            if b.button("Sign out"):
+def show_logo(path, width, fallback):
+    """Show a logo image, or a plain text title if the file isn't in the repo."""
+    if path.exists():
+        st.image(str(path), width=width)
+    else:
+        st.markdown(fallback)
+
+
+# ---------- TOP BAR (logo, name, sign in/out, dark mode) ----------
+_mode = st.session_state.auth_mode
+if _mode is None:
+    _, tog_col = st.columns([5, 1.8], vertical_alignment="center")
+    with tog_col:
+        dark = st.toggle("Dark mode", value=True, key="dark_mode")
+else:
+    logo_col, _, name_col, btn_col, tog_col = st.columns([3.2, 1.2, 2.4, 1.9, 1.9], vertical_alignment="center")
+    with logo_col:
+        show_logo(LOGO_HEADER, 250, "## 📚 StudyStack")
+    with name_col:
+        if _mode == "user":
+            st.markdown(f"👤 **{clean_name(st.session_state.auth_user['name'])}**")
+        else:
+            st.markdown("👤 **Guest**")
+    with btn_col:
+        if _mode == "user":
+            if st.button("Sign out", key="btn_signout"):
                 sign_out()
                 reset_session()
                 st.rerun()
         else:
-            a.markdown("👤 **Guest**")
-            if b.button("Sign in"):
+            if st.button("Sign in", key="btn_signin"):
                 reset_session()
                 st.rerun()
+    with tog_col:
+        dark = st.toggle("Dark mode", value=True, key="dark_mode")
 
 THEMES = {
     True: dict(
@@ -141,8 +173,14 @@ header[data-testid="stHeader"]{background:transparent;}
 [data-testid="stFileUploaderDropzone"]{background:var(--glass2);border:1.5px dashed var(--border);border-radius:18px;}
 [data-testid="stFileUploaderDropzone"] *{color:var(--text)!important;}
 [data-testid="stAlert"]{background:var(--glass2);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(14px);}
-.stButton>button,.stDownloadButton>button,[data-testid="stDownloadButton"]>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);}
+.stButton>button,.stDownloadButton>button,[data-testid="stDownloadButton"]>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);white-space:nowrap;}
 .stButton>button:hover,.stDownloadButton>button:hover,[data-testid="stDownloadButton"]>button:hover,[data-testid="stFormSubmitButton"]>button:hover{filter:brightness(1.12);color:#fff;}
+
+/* Top bar: keep "Dark mode" on one line */
+.st-key-dark_mode *{white-space:nowrap;}
+
+/* Centered logo on the login card */
+.st-key-card_login [data-testid="stImage"]{display:flex;justify-content:center;}
 
 /* Forms and chat bubbles */
 [data-testid="stForm"]{border:none!important;padding:0!important;background:transparent!important;}
@@ -181,7 +219,7 @@ def login_page():
     _, mid, _ = st.columns([1, 2, 1])
     with mid:
         with card("login"):
-            st.markdown("## 📚 StudyStack")
+            show_logo(LOGO_LOGIN, 240, "## 📚 StudyStack")
             st.caption("Sign in to keep your progress, or try the app as a guest.")
 
             if not auth_configured():
@@ -485,7 +523,6 @@ def build_dot(topic, concepts, links):
 
 
 # ---------- PAGE ----------
-st.title("📚 StudyStack")
 st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
 tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_quiz, tab_chat, tab_focus = st.tabs(
@@ -961,6 +998,6 @@ with tab_focus:
         st.progress(progress_val)
 
         if st.session_state.study_minutes >= 120:
-            st.success("🎉 Daily study goal reached! Amazing work.")
+            st.success("🎉 Daily study goal reached! Amazon work.")
         else:
             st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
