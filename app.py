@@ -998,6 +998,6 @@ with tab_focus:
         st.progress(progress_val)
 
         if st.session_state.study_minutes >= 120:
-            st.success("🎉 Daily study goal reached! Amazon work.")
+            st.success("🎉 Daily study goal reached! Amazing work.")
         else:
             st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
