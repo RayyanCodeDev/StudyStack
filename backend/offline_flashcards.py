@@ -112,11 +112,6 @@ SCRIPT = r'''
     const card = queue[index];
     if (currentId !== card?.id) flipped = false;
     currentId = card?.id || null;
-    
-    // If deck is completed
-    if (get('side').textContent === 'Complete') {
-        return;
-    }
 
     get('counter').textContent = card ? `${index + 1} / ${queue.length}` : 'No cards due';
     get('side').textContent = card ? (flipped ? 'Answer' : 'Question') : 'Caught up';
@@ -144,7 +139,7 @@ SCRIPT = r'''
   get('title').textContent = deck.title; get('subject').textContent = deck.subject;
   get('prev').onclick = () => navigate(-1); get('next').onclick = () => navigate(1);
   get('flip').onclick = () => { if (currentId) { flipped = !flipped; render(); } };
-  get('mode').onchange = () => { index = 0; flipped = false; get('side').textContent = 'Question'; render(); };
+  get('mode').onchange = () => { index = 0; flipped = false; render(); };
   
   for (const rating of ratings) get(rating.toLowerCase()).onclick = () => {
     if (!currentId || !flipped) return;
