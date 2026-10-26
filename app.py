@@ -439,6 +439,17 @@ def render_revision(result, set_id=None, namespace="current"):
     """Review one card at a time, revealing its answer before choosing a rating."""
     scope_key = f"speech_revision_{namespace}"
     with st.container(key=scope_key):
+        
+        # --- RESTORED NOTES & TXT DOWNLOAD ---
+        st.write(f"**Subject:** {result.get('subject')} | **Topic:** {result.get('topic')}")
+        notes = fix_latex(result.get("detailed_notes") or "No notes generated.")
+        with st.expander("📖 Detailed study notes", expanded=True):
+            read_aloud(notes, key=f"tts_notes_{namespace}", scope=scope_key)
+            st.markdown(notes)
+        st.download_button("⬇️ Download notes as TXT", notes, file_name="study_notes.txt", key=f"dl_notes_{namespace}")
+        st.write("---")
+        # -------------------------------------
+
         all_cards = list(flashcards(result))
         if not all_cards:
             st.info("No flashcards in this set yet.")
@@ -907,15 +918,6 @@ with tab_graph:
     if res is None:
         need_upload("graph")
     else:
-        with card("notes"):
-            st.header("Study notes")
-            st.write(f"**Subject:** {res.get('subject')} | **Topic:** {res.get('topic')}")
-            notes = fix_latex(res.get("detailed_notes") or "No notes generated.")
-            with st.expander("📖 Detailed notes", expanded=True):
-                read_aloud(notes, key="tts_notes", scope="card_notes")
-                st.markdown(notes)
-            st.download_button("⬇️ Download notes", notes, file_name="study_notes.txt", key="dl_notes")
-
         with card("graph"):
             st.header("Concept map")
             topic_name = str(res.get("topic", "")).strip().lower()
@@ -941,7 +943,7 @@ with tab_graph:
                 st.info("No key concepts were found in this material.")
 
         with card("flash"):
-            st.header("Flashcards & revision")
+            st.header("Study notes & Flashcards")
             render_revision(res, st.session_state.current_set_id)
 
 # --- SMART QUIZ ---
@@ -1115,4 +1117,3 @@ with tab_focus:
             st.success("🎉 Daily study goal reached! Amazing work.")
         else:
             st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
-
