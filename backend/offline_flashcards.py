@@ -58,6 +58,7 @@ SCRIPT = r'''
   const ratings = ['Again', 'Hard', 'Good', 'Easy'];
   const storageKey = 'studystack-offline-v1-' + deck.id;
   let storageOK = true, index = 0, flipped = false, currentId = null;
+  
   function clean(input) {
     const out = Object.create(null);
     if (!input || typeof input !== 'object' || Array.isArray(input)) return out;
@@ -72,6 +73,7 @@ SCRIPT = r'''
     }
     return out;
   }
+  
   let states = clean(deck.progress);
   
   function merge(input) {
@@ -80,8 +82,10 @@ SCRIPT = r'''
       if (!previous || (Date.parse(state.reviewed_at) || 0) >= (Date.parse(previous.reviewed_at) || 0)) states[id] = state;
     }
   }
+  
   try { merge(JSON.parse(localStorage.getItem(storageKey) || '{}')); }
   catch { storageOK = false; }
+  
   function persist() {
     try { localStorage.setItem(storageKey, JSON.stringify(states)); storageOK = true; }
     catch { storageOK = false; }
@@ -89,22 +93,37 @@ SCRIPT = r'''
       ? 'Progress is saved in this browser when local-file storage is supported. Download a backup to keep a portable copy.'
       : 'This browser cannot save this file’s progress automatically. Download a progress backup before closing it.';
   }
+  
   const isDue = card => !states[card.id] || Date.parse(states[card.id].due_at) <= Date.now();
   const cards = () => get('mode').value === 'due' ? deck.cards.filter(isDue).sort((a,b) =>
     (states[a.id] ? Date.parse(states[a.id].due_at) : Infinity) - (states[b.id] ? Date.parse(states[b.id].due_at) : Infinity)) : deck.cards;
     
+  // --- FIXED: Softer math multipliers ---
   function nextState(previous, rating) {
     let interval = previous?.interval_days || 0;
-    interval = rating === 'Again' ? 10 / 1440 : rating === 'Hard' ? Math.max(1, interval * 1.2)
-      : rating === 'Good' ? Math.max(1, interval * 2.5) : Math.max(4, interval * 3.5);
+    if (rating === 'Again') {
+      interval = 10 / 1440; // 10 minutes
+    } else if (rating === 'Hard') {
+      interval = interval < 1 ? 1 : Math.max(1, interval * 1.2);
+    } else if (rating === 'Good') {
+      interval = interval < 1 ? 2 : interval * 2;
+    } else if (rating === 'Easy') {
+      interval = interval < 1 ? 4 : interval * 3;
+    }
+    
     interval = Math.min(365, interval);
     return {interval_days: interval, reviews: Math.min(100000, (previous?.reviews || 0) + 1), rating,
       due_at: new Date(Date.now() + interval * 86400000).toISOString(), reviewed_at: new Date().toISOString()};
   }
   
+  // --- FIXED: No more decimals (e.g., 16.8 days) ---
   function label(state) {
     const days = state.interval_days;
-    return days < 1 ? Math.max(1, Math.round(days * 1440)) + ' min' : Number(days.toFixed(1)) + (days === 1 ? ' day' : ' days');
+    if (days < 1) {
+      return Math.max(1, Math.round(days * 1440)) + ' min';
+    }
+    const roundedDays = Math.round(days);
+    return roundedDays + (roundedDays === 1 ? ' day' : ' days');
   }
   
   function render() {
@@ -129,9 +148,9 @@ SCRIPT = r'''
   }
   
   function navigate(direction) { 
-    const length = cards().length; 
-    if (!length) return; 
-    index = Math.max(0, Math.min(index + direction, length - 1)); 
+    const list = cards(); 
+    if (!list.length) return; 
+    index = Math.max(0, Math.min(index + direction, list.length - 1)); 
     flipped = false; 
     render(); 
   }
