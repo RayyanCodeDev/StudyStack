@@ -1,7 +1,8 @@
-streamlit>=1.40
+streamlit>=1.56,<2
 google-genai
 pillow
 python-dotenv
 pypdf
 supabase
 pyarrow<25
+
