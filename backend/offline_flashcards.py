@@ -56,7 +56,9 @@ SCRIPT = r'''
   const byId = new Map(deck.cards.map(card => [card.id, card]));
   const get = id => document.getElementById(id);
   const ratings = ['Again', 'Hard', 'Good', 'Easy'];
-  const storageKey = 'studystack-offline-v1-' + deck.id;
+  
+  // CHANGED v1 to v2 so your browser forgets the old 42-day test data
+  const storageKey = 'studystack-offline-v2-' + deck.id; 
   let storageOK = true, index = 0, flipped = false, currentId = null;
   
   function clean(input) {
@@ -98,25 +100,35 @@ SCRIPT = r'''
   const cards = () => get('mode').value === 'due' ? deck.cards.filter(isDue).sort((a,b) =>
     (states[a.id] ? Date.parse(states[a.id].due_at) : Infinity) - (states[b.id] ? Date.parse(states[b.id].due_at) : Infinity)) : deck.cards;
     
-  // --- FIXED: Softer math multipliers ---
   function nextState(previous, rating) {
     let interval = previous?.interval_days || 0;
-    if (rating === 'Again') {
-      interval = 10 / 1440; // 10 minutes
-    } else if (rating === 'Hard') {
-      interval = interval < 1 ? 1 : Math.max(1, interval * 1.2);
-    } else if (rating === 'Good') {
-      interval = interval < 1 ? 2 : interval * 2;
-    } else if (rating === 'Easy') {
-      interval = interval < 1 ? 4 : interval * 3;
+    
+    // Hardcoded small numbers for the first review
+    if (!previous) {
+      if (rating === 'Again') interval = 10 / 1440; // 10 min
+      else if (rating === 'Hard') interval = 1; // 1 day
+      else if (rating === 'Good') interval = 2; // 2 days
+      else if (rating === 'Easy') interval = 3; // 3 days
+    } else {
+      // If they review it again later, slightly increase the days
+      if (rating === 'Again') interval = 10 / 1440;
+      else if (rating === 'Hard') interval = interval * 1.2;
+      else if (rating === 'Good') interval = interval * 1.5;
+      else if (rating === 'Easy') interval = interval * 2;
     }
     
-    interval = Math.min(365, interval);
-    return {interval_days: interval, reviews: Math.min(100000, (previous?.reviews || 0) + 1), rating,
-      due_at: new Date(Date.now() + interval * 86400000).toISOString(), reviewed_at: new Date().toISOString()};
+    // HARD CAP: Never show more than 5 days
+    interval = Math.min(5, interval);
+    
+    return {
+      interval_days: interval, 
+      reviews: Math.min(100000, (previous?.reviews || 0) + 1), 
+      rating: rating,
+      due_at: new Date(Date.now() + interval * 86400000).toISOString(), 
+      reviewed_at: new Date().toISOString()
+    };
   }
   
-  // --- FIXED: No more decimals (e.g., 16.8 days) ---
   function label(state) {
     const days = state.interval_days;
     if (days < 1) {
@@ -169,7 +181,6 @@ SCRIPT = r'''
       if (index < deck.cards.length - 1) {
         index++;
       } else {
-        // Prevent loop, show finished state
         get('side').textContent = 'Complete';
         get('content').textContent = '🎉 You have reviewed all cards in this deck! Click Previous to go back.';
         get('flip').disabled = true;
