@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from backend.auth import db
+from backend.revision import apply_review, clean_progress
 
 MAX_SETS = 50   # saved sets per student (keeps the free database plan from filling up)
 MAX_CHAT = 60   # messages kept per set
@@ -42,6 +43,25 @@ def group_sets_by_subject(rows):
     return dict(sorted(groups.items(), key=lambda item: (item[0] == "Uncategorized", item[0].casefold())))
 
 
+def search_sets(rows, query):
+    """Match every search word across titles, subjects and the actual study text."""
+    words = str(query or "").casefold().split()
+    if not words:
+        return list(rows)
+    matches = []
+    for row in rows:
+        result = row.get("result") or {}
+        parts = [row.get("title"), normalize_subject(row.get("subject")),
+                 result.get("topic"), result.get("summary"), result.get("detailed_notes"), result.get("raw_text")]
+        parts.extend(result.get("key_concepts", []))
+        for card in result.get("flashcards", []):
+            parts.extend([card.get("front"), card.get("back")])
+        haystack = " ".join(str(p or "") for p in parts).casefold()
+        if all(word in haystack for word in words):
+            matches.append(row)
+    return matches
+
+
 def clean_chat(chat):
     out = []
     if isinstance(chat, list):
@@ -61,7 +81,7 @@ def clean_result(r):
     concepts = r.get("key_concepts")
     cards = r.get("flashcards")
     rels = r.get("relationships")
-    return {
+    result = {
         "subject": normalize_subject(r.get("subject")),
         "topic": _s(r.get("topic"), 200),
         "summary": _s(r.get("summary"), 3000),
@@ -73,20 +93,26 @@ def clean_result(r):
         "flashcards": [{"front": _s(c.get("front"), 500), "back": _s(c.get("back"), 1500)}
                        for c in cards if isinstance(c, dict)][:30] if isinstance(cards, list) else [],
     }
+    result["review_progress"] = clean_progress(r.get("review_progress"), result["flashcards"])
+    return result
 
 
 # ---------- database (every call returns an error message instead of crashing) ----------
-def list_sets():
+def list_sets(include_material=True):
     try:
-        r = (db().table("study_sets").select("id,title,subject,created_at")
+        fields = "id,title,subject,created_at" + (",result" if include_material else "")
+        r = (db().table("study_sets").select(fields)
              .order("created_at", desc=True).limit(MAX_SETS).execute())
-        return r.data or [], None
+        rows = []
+        for row in r.data or []:
+            rows.append({**row, "result": clean_result(row.get("result")) or {}})
+        return rows, None
     except Exception:
         return [], "Couldn't load your library. Please try again."
 
 
 def save_set(result, chat):
-    rows, err = list_sets()
+    rows, err = list_sets(include_material=False)
     if err:
         return None, err
     if len(rows) >= MAX_SETS:
@@ -122,6 +148,40 @@ def update_chat(set_id, chat):
         ).eq("id", set_id).execute()
     except Exception:
         pass  # a failed chat save should never interrupt studying
+
+
+def review_saved_card(set_id, key, rating):
+    """Save only review progress; leave the student's chat and other sets alone.
+
+    Optimistic concurrency protects another tab's recent reviews/chat updates.
+    Existing study_sets JSON stores the schedule, so no SQL migration is needed.
+    """
+    try:
+        client = db()
+        response = (client.table("study_sets").select("result,updated_at")
+                    .eq("id", set_id).limit(1).execute())
+        if not response.data:
+            return None, "That set no longer exists. Refresh your library."
+        row = response.data[0]
+        result = clean_result(row.get("result"))
+        if result is None:
+            return None, "That set can't be reviewed."
+        updated = apply_review(result, key, rating)
+        # Preserve any other metadata in the stored result.
+        stored_result = {**row["result"], "review_progress": updated["review_progress"]}
+        query = (client.table("study_sets").update(
+            {"result": stored_result, "updated_at": datetime.now(timezone.utc).isoformat()})
+            .eq("id", set_id))
+        if row.get("updated_at") is None:
+            query = query.is_("updated_at", "null")
+        else:
+            query = query.eq("updated_at", row["updated_at"])
+        saved = query.execute()
+        if not saved.data:
+            return None, "This set changed in another tab. Refresh your library and try again."
+        return updated, None
+    except Exception:
+        return None, "Couldn't save your revision. Try again; your previous schedule is unchanged."
 
 
 def delete_set(set_id):
