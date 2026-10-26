@@ -6,6 +6,7 @@ import re
 import textwrap
 import time
 from pathlib import Path
+from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 from PIL import Image
@@ -14,7 +15,11 @@ from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_w
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
-                             load_set, save_set, update_chat, group_sets_by_subject)
+                             load_set, save_set, update_chat, group_sets_by_subject, search_sets, review_saved_card)
+from backend.revision import (RATINGS, apply_review, card_id, due_cards, flashcards,
+                              interval_label, parse_due, schedule_review)
+from backend.offline_flashcards import build_offline_flashcards, offline_filename
+from backend.read_aloud import read_aloud, concept_map_text, quiz_reading_text
 from backend.social import DAILY_CAP, award as award_points, fetch_social, remove_friend, respond_request, send_request
 
 BASE_DIR = Path(__file__).parent
@@ -40,7 +45,6 @@ DEFAULTS = {
     "analysis_result": None,
     "file_key": None,
     "chat_history": [],
-    "known": set(),          # flashcards marked "I knew it"
     "mcq": None,             # state of the multiple-choice quiz
     "study_minutes": 25,     # Focus Hub
     "sessions_completed": 2, # Focus Hub
@@ -58,6 +62,8 @@ DEFAULTS = {
     "flash": "",             # one-time message shown after a rerun (e.g. "+2 points")
     "friend_msg": None,
     "confirm_remove": None,
+    "library_search": "",
+    "revision_reveal": None,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -384,7 +390,7 @@ def save_result(result, key):
     st.session_state.analysis_result = clean
     st.session_state.file_key = key
     st.session_state.chat_history = []  # new material = fresh chat (name is kept)
-    st.session_state.known = set()
+    st.session_state.revision_reveal = None
     st.session_state.mcq = None
     st.session_state.current_set_id = None
     if st.session_state.auth_mode == "user":
@@ -420,7 +426,7 @@ def open_saved(set_id):
         return
     st.session_state.analysis_result = data["result"]
     st.session_state.chat_history = data["chat"]
-    st.session_state.known = set()
+    st.session_state.revision_reveal = None
     st.session_state.mcq = None
     st.session_state.current_set_id = set_id
     st.session_state.file_key = ("saved", set_id)
@@ -428,6 +434,75 @@ def open_saved(set_id):
     st.session_state.save_note = ""
     st.rerun()
 
+
+def render_revision(result, set_id=None, namespace="current"):
+    """Review one card at a time, revealing its answer before choosing a rating."""
+    scope_key = f"speech_revision_{namespace}"
+    with st.container(key=scope_key):
+        all_cards = list(flashcards(result))
+        if not all_cards:
+            st.info("No flashcards in this set yet.")
+            return
+        st.download_button("⬇️ Download offline flashcards", build_offline_flashcards(result),
+                           file_name=offline_filename(result.get("topic")), mime="text/html",
+                           key=f"offline_flashcards_{namespace}",
+                           help="Open the downloaded HTML file in a browser without internet. Offline progress stays on your device.")
+        now = datetime.now(timezone.utc)
+        due = due_cards(result, now)
+        reviewed = len(result.get("review_progress", {}))
+        st.caption(f"{len(due)} due · {reviewed} of {len(all_cards)} cards reviewed")
+        if st.session_state.auth_mode == "guest":
+            st.caption("Guest progress lasts for this session. Download your set from My Library to keep its revision schedule.")
+        elif not set_id:
+            st.caption("This set isn't saved. Download it from My Library to keep its revision schedule.")
+        identity = set_id or card_id({"front": result.get("topic"), "back": str(all_cards)})
+        scope = f"{namespace}_{identity}"
+        view = st.radio("Flashcards to show", ["Due for revision", "All flashcards"],
+                        horizontal=True, key=f"revision_view_{scope}")
+        available = due if view == "Due for revision" else all_cards
+        if not available:
+            st.success("You're caught up! No cards are due right now.")
+            dates = [parse_due(state.get("due_at")) for state in result.get("review_progress", {}).values()]
+            dates = [date for date in dates if date and date > now]
+            if dates:
+                minutes = max(1, round((min(dates) - now).total_seconds() / 60))
+                wait = f"{minutes} min" if minutes < 60 else (f"{minutes / 60:.1f} hours" if minutes < 1440 else f"{minutes / 1440:.1f} days")
+                st.caption(f"Your next card is due in about {wait}. You can still browse All flashcards.")
+            return
+        choices = dict(available)
+        key = st.selectbox("Choose a flashcard", list(choices),
+                           format_func=lambda value: choices[value]["front"], key=f"revision_card_{scope}")
+        current = choices[key]
+        previous = result.get("review_progress", {}).get(key)
+        reveal_token = (scope, key, (previous or {}).get("reviewed_at"))
+        st.markdown(f"**{current['front']}**")
+        if st.button("Show answer", key=f"reveal_{scope}_{key}"):
+            st.session_state.revision_reveal = reveal_token
+        spoken_card = current["front"]
+        if st.session_state.revision_reveal == reveal_token:
+            spoken_card += "\nAnswer: " + current["back"]
+        read_aloud(spoken_card, key=f"tts_revision_{scope}", scope=scope_key)
+        if st.session_state.revision_reveal != reveal_token:
+            st.caption("Try answering first, then reveal the answer and rate how well you remembered it.")
+            return
+        st.markdown(fix_latex(current["back"]))
+        st.caption("How well did you remember? The time on each button is your next review interval.")
+        for column, rating in zip(st.columns(4), RATINGS):
+            next_state = schedule_review(previous, rating, now)
+            if column.button(f"{rating} · {interval_label(next_state)}", key=f"rate_{scope}_{key}_{rating}"):
+                if st.session_state.auth_mode == "user" and set_id:
+                    updated, err = review_saved_card(set_id, key, rating)
+                    if err:
+                        st.error(err)
+                        return
+                    st.session_state.lib_cache = None
+                else:
+                    updated = apply_review(result, key, rating)
+                if set_id == st.session_state.current_set_id:
+                    st.session_state.analysis_result = updated
+                st.session_state.revision_reveal = None
+                st.session_state.flash = f"Review recorded. Next review in {interval_label(updated['review_progress'][key])}."
+                st.rerun()
 
 def build_mcq(flashcards):
     cards = [c for c in flashcards if str(c.get("front") or "").strip() and str(c.get("back") or "").strip()]
@@ -477,6 +552,8 @@ def mcq_quiz(flashcards):
     st.caption(f"Question {m['i'] + 1} of {len(qs)} | Score: {m['score']}")
     st.subheader(q["q"])
     pick = st.radio("Choose one:", q["options"], index=None, key=f"mcq_pick_{m['run']}_{m['i']}", disabled=m["checked"])
+    read_aloud(quiz_reading_text(q, m["checked"], m["correct"]),
+               key=f"tts_mcq_{m['run']}_{m['i']}", scope="card_quiz")
     if not m["checked"]:
         if st.button("Check answer", key="mcq_check"):
             if pick is None:
@@ -617,11 +694,40 @@ with tab_lib:
                 st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here automatically.")
             else:
                 st.caption(f"{len(lib['rows'])} of {MAX_SETS} sets saved. To study a set, press Open, then use the other tabs.")
+                query = st.text_input("Search your library", key="library_search",
+                                      placeholder="Search titles, subjects or words inside your notes")
+                matched = search_sets(lib["rows"], query)
+                matched_ids = {row["id"] for row in matched}
+                if query.strip():
+                    st.caption(f"{len(matched)} of {len(lib['rows'])} sets match your search.")
+                if not matched:
+                    st.info("No matching resources. Try another word or clear your search.")
+
+                with st.expander("🔁 Due for revision", expanded=True):
+                    review_sets = [row for row in matched if list(flashcards(row.get("result") or {}))]
+                    due_count = sum(len(due_cards(row["result"])) for row in review_sets)
+                    st.write(f"**{due_count} flashcards due** in {'matching sets' if query.strip() else 'your library'}.")
+                    st.caption("Again repeats sooner; Hard, Good and Easy gradually increase the gap between reviews.")
+                    if review_sets:
+                        by_id = {row["id"]: row for row in review_sets}
+                        selected = st.selectbox("Study set to revise", list(by_id), key="library_revision_set",
+                                                format_func=lambda value: f"{by_id[value]['title']} · {len(due_cards(by_id[value]['result']))} due")
+                        active = by_id[selected]
+                        render_revision(active["result"], active["id"], namespace="library")
+                    else:
+                        st.caption("Save a set with flashcards to start revising.")
+                    if st.button("Refresh library & due cards", key="refresh_library"):
+                        st.session_state.lib_cache = None
+                        st.rerun()
+
                 st.caption("Your notes are automatically organized by the subject identified by AI.")
                 subject_groups = group_sets_by_subject(lib["rows"])
                 subject_tabs = st.tabs(list(subject_groups))
                 for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
                     with subject_tab:
+                        subject_rows = [row for row in subject_rows if row["id"] in matched_ids]
+                        if not subject_rows:
+                            st.info("No resources in this subject match your search.")
                         for row in subject_rows:
                             c1, c2, c3, c4 = st.columns([5, 2, 1.3, 1.3])
                             c1.markdown(f"**{row['title']}**")
@@ -677,7 +783,7 @@ with tab_lib:
                     elif st.button("Load this set"):
                         st.session_state.analysis_result = restored
                         st.session_state.chat_history = clean_chat(payload_in.get("chat"))
-                        st.session_state.known = set()
+                        st.session_state.revision_reveal = None
                         st.session_state.mcq = None
                         st.session_state.current_set_id = None
                         st.session_state.file_key = ("file", f.name, f.size)
@@ -806,6 +912,7 @@ with tab_graph:
             st.write(f"**Subject:** {res.get('subject')} | **Topic:** {res.get('topic')}")
             notes = fix_latex(res.get("detailed_notes") or "No notes generated.")
             with st.expander("📖 Detailed notes", expanded=True):
+                read_aloud(notes, key="tts_notes", scope="card_notes")
                 st.markdown(notes)
             st.download_button("⬇️ Download notes", notes, file_name="study_notes.txt", key="dl_notes")
 
@@ -826,21 +933,16 @@ with tab_graph:
                 except TypeError:  # older Streamlit without the engine argument
                     st.graphviz_chart(dot, use_container_width=True)
                 st.caption("Solid lines connect the topic to its concepts. Dashed lines show how concepts relate.")
+                map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
+                read_aloud(map_words, key="tts_mindmap", scope="card_graph")
+                with st.expander("Read the concept map in words"):
+                    st.text(map_words)
             else:
                 st.info("No key concepts were found in this material.")
 
         with card("flash"):
-            st.header("Flashcards")
-            cards = res.get("flashcards", [])
-            st.caption(f"Mastered: {len(st.session_state.known)}/{len(cards)}")
-            for i, c in enumerate(cards):
-                with st.expander(f"❓ {c.get('front')}"):
-                    st.write(f"**Answer:** {c.get('back')}")
-                    if i in st.session_state.known:
-                        st.success("Marked as known ✅")
-                    elif st.button("✅ I knew it", key=f"known_{i}"):
-                        st.session_state.known.add(i)
-                        st.rerun()
+            st.header("Flashcards & revision")
+            render_revision(res, st.session_state.current_set_id)
 
 # --- SMART QUIZ ---
 with tab_quiz:
@@ -857,13 +959,19 @@ with tab_quiz:
             else:
                 st.write(f"Explain **{topic}** in your own words and get graded.")
                 answer = st.text_area("Your explanation", key="feynman_answer")
+                prompt_text = f"Explain {topic} in your own words."
+                if answer.strip():
+                    prompt_text += "\nYour explanation: " + answer
+                read_aloud(prompt_text, key="tts_feynman", scope="card_quiz")
                 if st.session_state.auth_mode == "user":
                     st.caption("Answers of 30+ characters earn points.")
                 if st.button("Grade my answer", key="feynman_grade"):
                     if answer.strip():
                         with st.spinner("Grading..."):
                             feedback = grade_answer(topic, answer)
-                        st.write(feedback)
+                        with st.container(key="speech_quiz_feedback"):
+                            st.write(feedback)
+                            read_aloud(feedback, key="tts_feynman_feedback", scope="speech_quiz_feedback")
                         if not feedback.startswith("⚠️") and len(answer.strip()) >= 30:
                             award("quiz", immediate=True)
                     else:
