@@ -175,7 +175,22 @@ header[data-testid="stHeader"]{background:transparent;}
 /* Expanders, inputs, alerts, uploader */
 [data-testid="stExpander"]{background:var(--glass);border:1px solid var(--border)!important;border-radius:16px!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 [data-testid="stExpander"] summary{font-weight:600;}
-.stTextArea textarea,.stTextInput input,.stNumberInput input{background:var(--glass2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:14px!important;}
+/* Fixed Inputs for Mobile/Light Mode */
+.stTextArea textarea, .stTextInput input, .stNumberInput input, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
+    background: var(--glass2) !important;
+    color: var(--text) !important;
+    -webkit-text-fill-color: var(--text) !important; /* Forces mobile browsers to show the text */
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    caret-color: var(--text) !important; /* Makes the blinking cursor visible */
+}
+
+/* Fix placeholder text visibility */
+.stTextArea textarea::placeholder, .stTextInput input::placeholder {
+    color: var(--muted) !important;
+    -webkit-text-fill-color: var(--muted) !important;
+    opacity: 0.7 !important;
+}
 [data-testid="stFileUploaderDropzone"]{background:var(--glass2);border:1.5px dashed var(--border);border-radius:18px;}
 [data-testid="stFileUploaderDropzone"] *{color:var(--text)!important;}
 [data-testid="stAlert"]{background:var(--glass2);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(14px);}
@@ -617,7 +632,7 @@ st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an 
 
 tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_quiz, tab_chat, tab_focus = st.tabs(
     ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Graph",
-     "🧠 Smart Quiz", "💬 AI Tutor", "⏱️ Focus Hub"]
+     "🧠 Metacognition Quiz", "💬 AI Tutor", "⏱️ Focus Hub"]
 )
 
 # --- HOME ---
