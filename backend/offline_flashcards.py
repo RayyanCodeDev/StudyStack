@@ -73,7 +73,7 @@ SCRIPT = r'''
     return out;
   }
   let states = clean(deck.progress);
-  // A newly exported copy may contain newer online progress than this browser has.
+  
   function merge(input) {
     for (const [id, state] of Object.entries(clean(input))) {
       const previous = states[id];
@@ -92,6 +92,7 @@ SCRIPT = r'''
   const isDue = card => !states[card.id] || Date.parse(states[card.id].due_at) <= Date.now();
   const cards = () => get('mode').value === 'due' ? deck.cards.filter(isDue).sort((a,b) =>
     (states[a.id] ? Date.parse(states[a.id].due_at) : Infinity) - (states[b.id] ? Date.parse(states[b.id].due_at) : Infinity)) : deck.cards;
+    
   function nextState(previous, rating) {
     let interval = previous?.interval_days || 0;
     interval = rating === 'Again' ? 10 / 1440 : rating === 'Hard' ? Math.max(1, interval * 1.2)
@@ -100,15 +101,23 @@ SCRIPT = r'''
     return {interval_days: interval, reviews: Math.min(100000, (previous?.reviews || 0) + 1), rating,
       due_at: new Date(Date.now() + interval * 86400000).toISOString(), reviewed_at: new Date().toISOString()};
   }
+  
   function label(state) {
     const days = state.interval_days;
     return days < 1 ? Math.max(1, Math.round(days * 1440)) + ' min' : Number(days.toFixed(1)) + (days === 1 ? ' day' : ' days');
   }
+  
   function render() {
     const queue = cards(); index = Math.max(0, Math.min(index, queue.length - 1));
     const card = queue[index];
     if (currentId !== card?.id) flipped = false;
     currentId = card?.id || null;
+    
+    // If deck is completed
+    if (get('side').textContent === 'Complete') {
+        return;
+    }
+
     get('counter').textContent = card ? `${index + 1} / ${queue.length}` : 'No cards due';
     get('side').textContent = card ? (flipped ? 'Answer' : 'Question') : 'Caught up';
     get('content').textContent = card ? (flipped ? card.back : card.front) : 'No cards are due right now. Come back later, or choose All flashcards.';
@@ -123,18 +132,43 @@ SCRIPT = r'''
       button.textContent = rating + (card ? ' · ' + label(nextState(states[card.id], rating)) : '');
     }
   }
-  function navigate(direction) { const length = cards().length; if (!length) return; index = (index + direction + length) % length; flipped = false; render(); }
+  
+  function navigate(direction) { 
+    const length = cards().length; 
+    if (!length) return; 
+    index = Math.max(0, Math.min(index + direction, length - 1)); 
+    flipped = false; 
+    render(); 
+  }
+  
   get('title').textContent = deck.title; get('subject').textContent = deck.subject;
   get('prev').onclick = () => navigate(-1); get('next').onclick = () => navigate(1);
   get('flip').onclick = () => { if (currentId) { flipped = !flipped; render(); } };
-  get('mode').onchange = () => { index = 0; flipped = false; render(); };
+  get('mode').onchange = () => { index = 0; flipped = false; get('side').textContent = 'Question'; render(); };
+  
   for (const rating of ratings) get(rating.toLowerCase()).onclick = () => {
     if (!currentId || !flipped) return;
     const state = nextState(states[currentId], rating); states[currentId] = state;
     persist(); get('status').textContent = `Recorded ${rating}. Next review in ${label(state)}.`;
-    if (get('mode').value === 'all') index = (index + 1) % deck.cards.length;
+    
+    if (get('mode').value === 'all') {
+      if (index < deck.cards.length - 1) {
+        index++;
+      } else {
+        // Prevent loop, show finished state
+        get('side').textContent = 'Complete';
+        get('content').textContent = '🎉 You have reviewed all cards in this deck! Click Previous to go back.';
+        get('flip').disabled = true;
+        get('next').disabled = true;
+        get('counter').textContent = `${deck.cards.length} / ${deck.cards.length}`;
+        for (const r of ratings) get(r.toLowerCase()).disabled = true;
+        get('status').textContent = 'Deck finished!';
+        return;
+      }
+    }
     flipped = false; render();
   };
+  
   get('backup').onclick = () => {
     const payload = {app:'studystack_offline_progress',version:1,deck_id:deck.id,progress:states};
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)], {type:'application/json'}));
@@ -142,6 +176,7 @@ SCRIPT = r'''
     document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     get('status').textContent = 'Progress backup downloaded. Keep it with your offline deck.';
   };
+  
   get('restore').onchange = async event => {
     const file = event.target.files?.[0]; if (!file) return;
     try {
@@ -153,12 +188,14 @@ SCRIPT = r'''
     } catch (error) { get('status').textContent = error.message || 'Could not restore progress.'; }
     event.target.value = '';
   };
+  
   document.addEventListener('keydown', event => {
     if (['INPUT','SELECT','TEXTAREA','BUTTON'].includes(event.target.tagName) || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.code === 'Space') { event.preventDefault(); get('flip').click(); }
     if (event.code === 'ArrowRight') { event.preventDefault(); navigate(1); }
     if (event.code === 'ArrowLeft') { event.preventDefault(); navigate(-1); }
   });
+  
   persist(); render(); setInterval(render, 60000);
 })();
 '''
