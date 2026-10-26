@@ -1084,7 +1084,7 @@ with tab_focus:
 
         col1, col2 = st.columns(2)
         with col1:
-            session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work", "Revision"],
+            session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"],
                                         key="focus_hub_study_mode")
         with col2:
             st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
