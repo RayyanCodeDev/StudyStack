@@ -49,6 +49,9 @@ DEFAULTS = {
     "mcq": None,             # state of the multiple-choice quiz
     "study_minutes": 25,     # Focus Hub
     "sessions_completed": 2, # Focus Hub
+    "focus_timer_active": False, # Focus Hub
+    "focus_timer_end": 0,        # Focus Hub
+    "focus_timer_mins": 25,      # Focus Hub
     "voice_gen": 0,          # changing this empties the voice recorder
     "user_name": "",
     "name_asked": False,
@@ -1078,96 +1081,74 @@ with tab_chat:
 with tab_focus:
     with card("focus_hub_tab"):
         st.header("⏱️ Focus & Pomodoro Hub")
-        st.write("Stay locked in. Choose your study mode, track your focus time, and build your daily study streak.")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"],
-                                        key="focus_hub_study_mode")
-        with col2:
-            st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
-
-        st.markdown("---")
         
-        selected_minutes = 25 if session_type == "Deep Work Pomodoro (25m)" else (30 if session_type == "Shallow Work (30m)" else 10)
-
-        # --- THE LIVE JAVASCRIPT TIMER ---
-        timer_html = f"""
-        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 20px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
-            <div id="timer-display" style="font-size: 4rem; font-weight: 800; margin-bottom: 20px;">{selected_minutes:02d}:00</div>
-            <button id="start-btn" onclick="toggleTimer()" style="background: linear-gradient(135deg, #7c5cff, #00c8ff); color: white; border: none; border-radius: 999px; padding: 10px 30px; font-weight: 700; cursor: pointer; font-size: 1rem; transition: 0.2s;">Start Timer</button>
-            <button onclick="resetTimer()" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 10px 30px; font-weight: 700; cursor: pointer; font-size: 1rem; margin-left: 10px; transition: 0.2s;">Reset</button>
-        </div>
-        <script>
-            let timeLeft = {selected_minutes} * 60;
-            let totalTime = {selected_minutes} * 60;
-            let timerId = null;
-            let isRunning = false;
-
-            function updateDisplay() {{
-                let minutes = Math.floor(timeLeft / 60);
-                let seconds = timeLeft % 60;
-                document.getElementById('timer-display').innerText = 
-                    String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
-            }}
-
-            function toggleTimer() {{
-                const btn = document.getElementById('start-btn');
-                if (isRunning) {{
-                    clearInterval(timerId);
-                    isRunning = false;
-                    btn.innerText = "Resume Timer";
-                }} else {{
-                    if (timeLeft <= 0) return;
-                    isRunning = true;
-                    btn.innerText = "Pause Timer";
-                    timerId = setInterval(() => {{
-                        if (timeLeft > 0) {{
-                            timeLeft--;
-                            updateDisplay();
-                        }} else {{
-                            clearInterval(timerId);
-                            isRunning = false;
-                            btn.innerText = "Finished!";
-                            setTimeout(() => alert("🎉 Timer finished! Great job focusing."), 100);
-                        }}
-                    }}, 1000);
-                }}
-            }}
-
-            function resetTimer() {{
-                clearInterval(timerId);
-                isRunning = false;
-                timeLeft = totalTime;
-                document.getElementById('start-btn').innerText = "Start Timer";
-                updateDisplay();
-            }}
-            updateDisplay();
-        </script>
-        """
-        components.html(timer_html, height=200)
-
-        # --- CLAIM BUTTON ---
-        if st.button(f"✅ Log {selected_minutes} min Session"):
-            st.session_state.study_minutes += selected_minutes
+        if st.session_state.focus_timer_active:
+            # --- RUNNING TIMER STATE ---
+            st.write("Stay locked in. Do not close this tab.")
+            timer_placeholder = st.empty()
+            
+            # Real Python Timer Loop (Blocks cheating)
+            while time.time() < st.session_state.focus_timer_end:
+                remaining = int(st.session_state.focus_timer_end - time.time())
+                if remaining < 0:
+                    remaining = 0
+                mins, secs = divmod(remaining, 60)
+                
+                timer_placeholder.markdown(f"""
+                <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
+                    <div style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
+                    <p style="color: #aab4d4;">Focusing...</p>
+                </div>
+                """, unsafe_allow_html=True)
+                time.sleep(1)
+            
+            # When loop finishes
+            mins_added = st.session_state.focus_timer_mins
+            st.session_state.study_minutes += mins_added
             st.session_state.sessions_completed += 1
+            st.session_state.focus_timer_active = False
+            
             st.balloons()
+            st.success(f"🎉 Session complete! +{mins_added} minutes added to your focus time.")
+            time.sleep(2)
             st.rerun()
             
-        st.caption("💡 *Click 'Log Session' only after you finish your focus time to claim your points.*")
-
-        st.markdown("---")
-        st.subheader("📊 Study Analytics")
-        st.write(f"**Completed Sessions Today:** {st.session_state.sessions_completed}")
-
-        progress_val = min(st.session_state.study_minutes / 120.0, 1.0)
-        st.write("Daily Goal Progress (Target: 120 mins):")
-        st.progress(progress_val)
-
-        if st.session_state.study_minutes >= 120:
-            st.success("🎉 Daily study goal reached! Amazing work.")
         else:
-            st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
+            # --- SETUP STATE ---
+            st.write("Stay locked in. Choose your study mode, track your focus time, and build your daily study streak.")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"],
+                                            key="focus_hub_study_mode")
+            with col2:
+                st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
+
+            st.markdown("---")
+            
+            selected_minutes = 25 if session_type == "Deep Work Pomodoro (25m)" else (30 if session_type == "Shallow Work (30m)" else 10)
+            
+            st.write(f"Ready to focus for **{selected_minutes} minutes**?")
+            st.caption("⚠️ *Warning: You must stay on this tab for the entire duration. If you switch tabs or refresh, the session will reset.*")
+            
+            if st.button("🚀 Start Focus Session"):
+                st.session_state.focus_timer_active = True
+                st.session_state.focus_timer_end = time.time() + (selected_minutes * 60)
+                st.session_state.focus_timer_mins = selected_minutes
+                st.rerun()
+
+            st.markdown("---")
+            st.subheader("📊 Study Analytics")
+            st.write(f"**Completed Sessions Today:** {st.session_state.sessions_completed}")
+
+            progress_val = min(st.session_state.study_minutes / 120.0, 1.0)
+            st.write("Daily Goal Progress (Target: 120 mins):")
+            st.progress(progress_val)
+
+            if st.session_state.study_minutes >= 120:
+                st.success("🎉 Daily study goal reached! Amazing work.")
+            else:
+                st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
 
 # --- METACOGNITION QUIZ ---
 with tab_quiz:
