@@ -1085,7 +1085,7 @@ with tab_focus:
         
         # Initialize states if they don't exist
         if "focus_timer_state" not in st.session_state:
-            st.session_state.focus_timer_state = "idle" # "idle", "running", "paused", "done"
+            st.session_state.focus_timer_state = "idle" # "idle", "running", "paused"
         if "focus_timer_end" not in st.session_state:
             st.session_state.focus_timer_end = 0
         if "focus_timer_remaining" not in st.session_state:
@@ -1121,35 +1121,47 @@ with tab_focus:
             if remaining <= 0:
                 st.session_state.study_minutes += st.session_state.focus_timer_mins
                 st.session_state.sessions_completed += 1
-                st.session_state.focus_timer_state = "done"
+                st.session_state.focus_timer_state = "idle"
                 st.balloons()
                 st.success(f"🎉 Session complete! +{st.session_state.focus_timer_mins} minutes added to your focus time.")
                 time.sleep(3)
-                st.session_state.focus_timer_state = "idle"
                 st.rerun()
             else:
                 mins, secs = divmod(remaining, 60)
                 
-                timer_placeholder = st.empty()
-                timer_placeholder.markdown(f"""
+                # JavaScript Timer (No more blinking!)
+                timer_html = f"""
                 <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
-                    <div style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
+                    <div id="timer-display" style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
                     <p style="color: #aab4d4;">Focusing...</p>
                 </div>
-                """, unsafe_allow_html=True)
+                <script>
+                    let timeLeft = {remaining};
+                    function updateDisplay() {{
+                        let m = Math.floor(timeLeft / 60);
+                        let s = timeLeft % 60;
+                        document.getElementById('timer-display').innerText = String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
+                        if (timeLeft > 0) {{
+                            timeLeft--;
+                            setTimeout(updateDisplay, 1000);
+                        }}
+                    }}
+                    setTimeout(updateDisplay, 1000);
+                </script>
+                """
+                components.html(timer_html, height=220)
+                
+                st.info("💡 You can safely switch tabs. The timer will keep running in the background.")
                 
                 c1, c2 = st.columns(2)
                 if c1.button("⏸️ Pause Timer"):
-                    st.session_state.focus_timer_remaining = remaining
                     st.session_state.focus_timer_state = "paused"
+                    st.session_state.focus_timer_remaining = remaining
                     st.rerun()
                 if c2.button("🛑 Stop & Reset"):
                     st.session_state.focus_timer_state = "idle"
                     st.rerun()
                     
-                time.sleep(1)
-                st.rerun()
-
         elif st.session_state.focus_timer_state == "paused":
             remaining = st.session_state.focus_timer_remaining
             mins, secs = divmod(remaining, 60)
