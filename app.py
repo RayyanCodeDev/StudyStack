@@ -700,7 +700,7 @@ with tab_home:
         # --- THE TUTORIAL BUTTON ---
         st.markdown("---")
         st.link_button(
-            "🎥 Watch the Quick Tutorial (No Audio)", 
+            "🎥 Watch the Quick Tutorial", 
             "PASTE_YOUR_YOUTUBE_LINK_HERE", 
             use_container_width=True
         )
