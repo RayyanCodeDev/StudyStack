@@ -124,13 +124,13 @@ THEMES = {
         TEXT="#f2f5ff", MUTED="#aab4d4", GLASS="rgba(255,255,255,0.07)", GLASS2="rgba(255,255,255,0.10)",
         BORDER="rgba(255,255,255,0.20)", SHADOW="0 10px 40px rgba(0,0,0,0.45)", GLOW="rgba(124,140,255,0.35)",
         BASE="#080b1a", O1="rgba(124,92,255,0.55)", O2="rgba(0,200,255,0.40)", O3="rgba(255,90,140,0.40)",
-        INPUT_BG="#1a1c29",  # Dark solid background for mobile inputs
+        INPUT_BG="#1a1c29",
     ),
     False: dict(
         TEXT="#14182b", MUTED="#4a5273", GLASS="rgba(255,255,255,0.55)", GLASS2="rgba(255,255,255,0.75)",
         BORDER="rgba(255,255,255,0.95)", SHADOW="0 10px 40px rgba(70,80,160,0.20)", GLOW="rgba(124,140,255,0.45)",
         BASE="#e9eeff", O1="rgba(150,120,255,0.55)", O2="rgba(80,200,255,0.50)", O3="rgba(255,150,180,0.50)",
-        INPUT_BG="#ffffff",  # Light solid background for mobile inputs
+        INPUT_BG="#ffffff",
     ),
 }
 
@@ -180,12 +180,12 @@ header[data-testid="stHeader"]{background:transparent;}
 
 /* Fixed Inputs for Mobile (Dark & Light Mode) */
 .stTextArea textarea, .stTextInput input, .stNumberInput input, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
-    background: var(--input-bg) !important; /* Uses the solid fallback color */
+    background: var(--input-bg) !important;
     color: var(--text) !important;
-    -webkit-text-fill-color: var(--text) !important; /* Forces mobile browsers to show the text */
+    -webkit-text-fill-color: var(--text) !important;
     border: 1px solid var(--border) !important;
     border-radius: 14px !important;
-    caret-color: var(--text) !important; /* Makes the blinking cursor visible */
+    caret-color: var(--text) !important;
 }
 
 /* Fix placeholder text visibility */
@@ -220,6 +220,18 @@ for k, v in THEMES[dark].items():
     css = css.replace(f"__{k}__", v)
 st.markdown(css, unsafe_allow_html=True)
 
+# ---------- THE HOOKLINE (Top Most Area) ----------
+st.markdown("""
+<div style="text-align: center; margin-top: 0.5rem; margin-bottom: 1.5rem;">
+    <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2.8rem; font-weight: 800; 
+               background: -webkit-linear-gradient(45deg, #7c5cff, #00c8ff); 
+               -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+               margin: 0; letter-spacing: -0.03em;">
+        Snap it. Stack it. Master it.
+    </h1>
+</div>
+""", unsafe_allow_html=True)
+# -----------------------------------------------
 
 def card(name):
     return st.container(border=True, key=f"card_{name}")
