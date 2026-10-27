@@ -108,10 +108,16 @@ else:
     with logo_col:
         show_logo(LOGO_HEADER, 250, "## 📚 StudyStack")
     with name_col:
-        if _mode == "user":
-            st.markdown(f"👤 **{clean_name(st.session_state.auth_user['name'])}**")
+        # --- FIXED NAME LOGIC ---
+        display_name = st.session_state.user_name
+        if not display_name and _mode == "user" and st.session_state.auth_user:
+            display_name = clean_name(st.session_state.auth_user['name'])
+            
+        if display_name:
+            st.markdown(f"👤 **{display_name}**")
         else:
             st.markdown("👤 **Guest**")
+        # ------------------------
     with btn_col:
         if _mode == "user":
             if st.button("Sign out", key="btn_signout"):
