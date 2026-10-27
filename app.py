@@ -16,11 +16,12 @@ from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_w
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
-                             load_set, save_set, update_chat, group_sets_by_subject, search_sets, review_saved_card)
+                             load_set, save_set, update_chat, group_sets_by_subject, review_saved_card)
 from backend.revision import (RATINGS, apply_review, card_id, due_cards, flashcards,
                               interval_label, parse_due, schedule_review)
 from backend.offline_flashcards import build_offline_flashcards, offline_filename
 from backend.read_aloud import read_aloud, concept_map_text, quiz_reading_text
+from backend.sources import make_image_source, make_pdf_source, save_source, load_source, source_bytes
 from backend.social import DAILY_CAP, award as award_points, fetch_social, remove_friend, respond_request, send_request
 
 BASE_DIR = Path(__file__).parent
@@ -45,6 +46,7 @@ MAX_RESTORE_MB = 2
 DEFAULTS = {
     "analysis_result": None,
     "file_key": None,
+    "source": None,          # the original screenshot / PDF of the open set
     "chat_history": [],
     "mcq": None,             # state of the multiple-choice quiz
     "study_minutes": 25,     # Focus Hub
@@ -67,7 +69,6 @@ DEFAULTS = {
     "flash": "",             # one-time message shown after a rerun (e.g. "+2 points")
     "friend_msg": None,
     "confirm_remove": None,
-    "library_search": "",
     "revision_reveal": None,
 }
 for k, v in DEFAULTS.items():
@@ -413,8 +414,8 @@ def friend_action(fn, *args):
         st.rerun()
 
 
-def save_result(result, key):
-    """Store a fresh analysis, and save it to the library when the visitor is signed in."""
+def save_result(result, key, source=None):
+    """Store a fresh analysis, and save it (with its original upload) to the library when signed in."""
     if "error" in result:
         st.error(f"Analysis failed: {result['error']}")
         return
@@ -424,6 +425,7 @@ def save_result(result, key):
         return
     st.session_state.analysis_result = clean
     st.session_state.file_key = key
+    st.session_state.source = source
     st.session_state.chat_history = []  # new material = fresh chat (name is kept)
     st.session_state.revision_reveal = None
     st.session_state.mcq = None
@@ -436,6 +438,9 @@ def save_result(result, key):
             st.session_state.current_set_id = set_id
             st.session_state.lib_cache = None
             st.session_state.save_note = "✅ Saved to your library."
+            if source:
+                if save_source(set_id, source):
+                    st.session_state.save_note += " (The original file couldn't be stored.)"
         award("analyze", immediate=True)
     else:
         st.session_state.save_note = "Guest mode: nothing is saved. Use the 📚 My Library tab to download this set."
@@ -448,25 +453,47 @@ def show_done():
         (st.warning if note.startswith("⚠️") else st.caption)(note)
 
 
+def show_source(src):
+    """Show the original screenshot, or the details of the original PDF."""
+    if not src:
+        return
+    raw = source_bytes(src)
+    if src.get("kind") == "image":
+        if raw:
+            st.image(raw, caption=src.get("name") or "Uploaded screenshot", width=400)
+        else:
+            st.caption("The original screenshot isn't available for this set.")
+    else:
+        pages = f" · pages {src['page_range']}" if src.get("page_range") else ""
+        st.write(f"📄 **{src.get('name') or 'PDF'}**{pages}")
+        if raw:
+            st.download_button("⬇️ Download the PDF pages", raw, file_name=src.get("name") or "study.pdf",
+                               mime="application/pdf", key="dl_source_pdf")
+        else:
+            st.caption("This PDF was too large to store, so only its name and page range are kept.")
+
+
 def persist_chat():
     sid = st.session_state.current_set_id
     if st.session_state.auth_mode == "user" and sid:
         update_chat(sid, st.session_state.chat_history)
 
 
-def open_saved(set_id):
+def open_saved(set_id, title=""):
     data, err = load_set(set_id)
     if err:
         st.error(err)
         return
     st.session_state.analysis_result = data["result"]
     st.session_state.chat_history = data["chat"]
+    st.session_state.source = load_source(set_id)
     st.session_state.revision_reveal = None
     st.session_state.mcq = None
     st.session_state.current_set_id = set_id
     st.session_state.file_key = ("saved", set_id)
     st.session_state.upload_gen += 1  # clears the uploader so an old file can't overwrite this set
     st.session_state.save_note = ""
+    st.session_state.flash = f"Opened “{title}”. Check the other tabs." if title else "Set opened. Check the other tabs."
     st.rerun()
 
 
@@ -683,7 +710,7 @@ with tab_cap:
                 if st.session_state.file_key != key:
                     with st.spinner("Extracting knowledge and generating study materials..."):
                         result = analyze_image(uploaded)
-                    save_result(result, key)
+                    save_result(result, key, source=make_image_source(uploaded))
                 if st.session_state.file_key == key:
                     show_done()
 
@@ -713,11 +740,17 @@ with tab_cap:
                         else:
                             st.caption(f"{count} page{'s' if count != 1 else ''} selected.")
                             if st.button("Analyze pages"):
+                                sliced = pdf_slice(data, start, end)
                                 with st.spinner("Reading your PDF and generating study materials..."):
-                                    result = analyze_pdf(pdf_slice(data, start, end))
-                                save_result(result, key)
+                                    result = analyze_pdf(sliced)
+                                save_result(result, key, source=make_pdf_source(uploaded.name, start, end, sliced))
                             if st.session_state.file_key == key:
                                 show_done()
+
+        elif st.session_state.source:
+            # No new file chosen: show the original upload of the set that is open
+            st.caption("📎 The original upload for the set you have open:")
+            show_source(st.session_state.source)
 
 # --- MY LIBRARY ---
 with tab_lib:
@@ -739,47 +772,19 @@ with tab_lib:
             elif not lib["rows"]:
                 st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here automatically.")
             else:
-                st.caption(f"{len(lib['rows'])} of {MAX_SETS} sets saved. To study a set, press Open, then use the other tabs.")
-                query = st.text_input("Search your library", key="library_search",
-                                      placeholder="Search titles, subjects or words inside your notes")
-                matched = search_sets(lib["rows"], query)
-                matched_ids = {row["id"] for row in matched}
-                if query.strip():
-                    st.caption(f"{len(matched)} of {len(lib['rows'])} sets match your search.")
-                if not matched:
-                    st.info("No matching resources. Try another word or clear your search.")
-
-                with st.expander("🔁 Due for revision", expanded=True):
-                    review_sets = [row for row in matched if list(flashcards(row.get("result") or {}))]
-                    due_count = sum(len(due_cards(row["result"])) for row in review_sets)
-                    st.write(f"**{due_count} flashcards due** in {'matching sets' if query.strip() else 'your library'}.")
-                    st.caption("Again repeats sooner; Hard, Good and Easy gradually increase the gap between reviews.")
-                    if review_sets:
-                        by_id = {row["id"]: row for row in review_sets}
-                        selected = st.selectbox("Study set to revise", list(by_id), key="library_revision_set",
-                                                format_func=lambda value: f"{by_id[value]['title']} · {len(due_cards(by_id[value]['result']))} due")
-                        active = by_id[selected]
-                        render_revision(active["result"], active["id"], namespace="library")
-                    else:
-                        st.caption("Save a set with flashcards to start revising.")
-                    if st.button("Refresh library & due cards", key="refresh_library"):
-                        st.session_state.lib_cache = None
-                        st.rerun()
-
+                st.caption(f"{len(lib['rows'])} of {MAX_SETS} sets saved. Press Open on any set to load its notes, "
+                           "flashcards, concept map and original upload in the other tabs.")
                 st.caption("Your notes are automatically organized by the subject identified by AI.")
                 subject_groups = group_sets_by_subject(lib["rows"])
                 subject_tabs = st.tabs(list(subject_groups))
                 for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
                     with subject_tab:
-                        subject_rows = [row for row in subject_rows if row["id"] in matched_ids]
-                        if not subject_rows:
-                            st.info("No resources in this subject match your search.")
                         for row in subject_rows:
                             c1, c2, c3, c4 = st.columns([5, 2, 1.3, 1.3])
                             c1.markdown(f"**{row['title']}**")
                             c2.caption(str(row["created_at"])[:10])
                             if c3.button("Open", key=f"open_{row['id']}"):
-                                open_saved(row["id"])
+                                open_saved(row["id"], row["title"])
                             if c4.button("Delete", key=f"del_{row['id']}"):
                                 st.session_state.confirm_delete = row["id"]
                                 st.rerun()
@@ -829,6 +834,7 @@ with tab_lib:
                     elif st.button("Load this set"):
                         st.session_state.analysis_result = restored
                         st.session_state.chat_history = clean_chat(payload_in.get("chat"))
+                        st.session_state.source = None
                         st.session_state.revision_reveal = None
                         st.session_state.mcq = None
                         st.session_state.current_set_id = None
