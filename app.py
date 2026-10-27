@@ -701,7 +701,7 @@ with tab_home:
         st.markdown("---")
         st.link_button(
             "🎥 Watch the Quick Tutorial", 
-            "PASTE_YOUR_YOUTUBE_LINK_HERE", 
+            "https://youtu.be/yfezlcTELHQ", 
             use_container_width=True
         )
         st.caption("New here? Watch a quick silent walkthrough of how to use StudyStack.")
