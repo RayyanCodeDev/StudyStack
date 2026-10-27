@@ -689,12 +689,25 @@ tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz =
 )
 
 # --- HOME ---
+# --- HOME ---
 with tab_home:
     with card("home"):
         st.header("Welcome to StudyStack")
         st.write("Upload a screenshot or a PDF of a lecture, syllabus or chat. StudyStack extracts the text, writes notes, "
                  "makes flashcards, draws a concept map, grades your explanations, tutors you by text or voice, "
                  "and tracks your daily study focus time.")
+        
+        # --- THE TUTORIAL BUTTON ---
+        st.markdown("---")
+        st.link_button(
+            "🎥 Watch the Quick Tutorial (No Audio)", 
+            "PASTE_YOUR_YOUTUBE_LINK_HERE", 
+            use_container_width=True
+        )
+        st.caption("New here? Watch a quick silent walkthrough of how to use StudyStack.")
+        st.markdown("---")
+        # ----------------------------
+
         if st.session_state.auth_mode == "guest":
             st.info("You're in guest mode, so nothing is saved on our side. Use **Sign in** (top right) to create an account, "
                     "keep your streak and compete with friends.")
@@ -1015,10 +1028,14 @@ with tab_chat:
                     c1, c2, _ = st.columns([1, 1, 4])
                     go = c1.form_submit_button("Continue")
                     skip = c2.form_submit_button("Skip")
-                if go:
+                    if go:
                     cleaned = clean_name(n)
                     if cleaned:
                         st.session_state.user_name = cleaned
+                        # --- FIX: Also update the auth_user dictionary ---
+                        if st.session_state.auth_mode == "user" and st.session_state.auth_user:
+                            st.session_state.auth_user["name"] = cleaned
+                        # -------------------------------------------------
                         st.session_state.name_asked = True
                         st.rerun()
                     else:
