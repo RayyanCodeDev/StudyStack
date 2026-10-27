@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes
@@ -1130,6 +1131,51 @@ with tab_quiz:
             else:
                 st.write(f"Explain **{topic}** in your own words and get graded.")
                 answer = st.text_area("Your explanation", key="feynman_answer")
+                
+                # --- COPY BUTTON FEATURE ---
+                components.html(
+                    """
+                    <style>
+                    body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
+                    .copy-btn {
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        color: #f2f5ff;
+                        border-radius: 999px;
+                        padding: 8px 16px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        font-family: 'Plus Jakarta Sans', sans-serif;
+                        transition: 0.3s;
+                        width: 100%;
+                        text-align: center;
+                    }
+                    .copy-btn:hover {
+                        background: rgba(255, 255, 255, 0.15);
+                    }
+                    </style>
+                    <button class="copy-btn" onclick="copyText()">📋 Copy Explanation</button>
+                    <script>
+                    function copyText() {
+                        const textareas = window.parent.document.querySelectorAll('textarea');
+                        if (textareas.length > 0) {
+                            const target = textareas[textareas.length - 1]; // grabs the latest textarea
+                            if (target && target.value) {
+                                navigator.clipboard.writeText(target.value).then(() => {
+                                    alert("✅ Copied to clipboard!");
+                                });
+                            } else {
+                                alert("⚠️ Your explanation is empty.");
+                            }
+                        }
+                    }
+                    </script>
+                    """,
+                    height=45
+                )
+                # ---------------------------
+
                 prompt_text = f"Explain {topic} in your own words."
                 if answer.strip():
                     prompt_text += "\nYour explanation: " + answer
