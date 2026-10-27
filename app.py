@@ -1020,7 +1020,7 @@ with tab_chat:
             st.header("AI Tutor & Voice Hub")
             st.caption("StudyStack is an AI and can make mistakes. Double-check important facts, especially before exams.")
             # Step 1: ask the student's name (skipped for signed-in users, who already have one)
-            if not st.session_state.name_asked:
+                       if not st.session_state.name_asked:
                 with st.chat_message("assistant"):
                     st.markdown("Hi! I'm your StudyStack tutor 👋 What should I call you?")
                 with st.form("name_form", clear_on_submit=True):
@@ -1028,16 +1028,18 @@ with tab_chat:
                     c1, c2, _ = st.columns([1, 1, 4])
                     go = c1.form_submit_button("Continue")
                     skip = c2.form_submit_button("Skip")
-                    if go:
+                if go:
                     cleaned = clean_name(n)
                     if cleaned:
                         st.session_state.user_name = cleaned
-                        # --- FIX: Also update the auth_user dictionary ---
                         if st.session_state.auth_mode == "user" and st.session_state.auth_user:
                             st.session_state.auth_user["name"] = cleaned
-                        # -------------------------------------------------
                         st.session_state.name_asked = True
                         st.rerun()
+                if skip:
+                    st.session_state.user_name = ""
+                    st.session_state.name_asked = True
+                    st.rerun()
                     else:
                         st.warning("Type a name, or press Skip.")
                 if skip:
