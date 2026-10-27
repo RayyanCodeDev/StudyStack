@@ -1088,20 +1088,73 @@ with tab_focus:
             st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
 
         st.markdown("---")
-        st.subheader("🎯 Active Session Controller")
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            if st.button("🚀 Start Focus Session"):
-                st.success("Focus timer active! Put your phone down and lock in.")
-        with col_b:
-            if st.button("☕ Take 5m Break"):
-                st.info("Break started. Rest your eyes!")
-        with col_c:
-            if st.button("✅ Log +25m Completed"):
-                st.session_state.study_minutes += 25
-                st.session_state.sessions_completed += 1
-                st.balloons()
-                st.rerun()
+        
+        selected_minutes = 25 if session_type == "Deep Work Pomodoro (25m)" else (30 if session_type == "Shallow Work (30m)" else 10)
+
+        # --- THE LIVE JAVASCRIPT TIMER ---
+        timer_html = f"""
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 20px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
+            <div id="timer-display" style="font-size: 4rem; font-weight: 800; margin-bottom: 20px;">{selected_minutes:02d}:00</div>
+            <button id="start-btn" onclick="toggleTimer()" style="background: linear-gradient(135deg, #7c5cff, #00c8ff); color: white; border: none; border-radius: 999px; padding: 10px 30px; font-weight: 700; cursor: pointer; font-size: 1rem; transition: 0.2s;">Start Timer</button>
+            <button onclick="resetTimer()" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 10px 30px; font-weight: 700; cursor: pointer; font-size: 1rem; margin-left: 10px; transition: 0.2s;">Reset</button>
+        </div>
+        <script>
+            let timeLeft = {selected_minutes} * 60;
+            let totalTime = {selected_minutes} * 60;
+            let timerId = null;
+            let isRunning = false;
+
+            function updateDisplay() {{
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                document.getElementById('timer-display').innerText = 
+                    String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
+            }}
+
+            function toggleTimer() {{
+                const btn = document.getElementById('start-btn');
+                if (isRunning) {{
+                    clearInterval(timerId);
+                    isRunning = false;
+                    btn.innerText = "Resume Timer";
+                }} else {{
+                    if (timeLeft <= 0) return;
+                    isRunning = true;
+                    btn.innerText = "Pause Timer";
+                    timerId = setInterval(() => {{
+                        if (timeLeft > 0) {{
+                            timeLeft--;
+                            updateDisplay();
+                        }} else {{
+                            clearInterval(timerId);
+                            isRunning = false;
+                            btn.innerText = "Finished!";
+                            setTimeout(() => alert("🎉 Timer finished! Great job focusing."), 100);
+                        }}
+                    }}, 1000);
+                }}
+            }}
+
+            function resetTimer() {{
+                clearInterval(timerId);
+                isRunning = false;
+                timeLeft = totalTime;
+                document.getElementById('start-btn').innerText = "Start Timer";
+                updateDisplay();
+            }}
+            updateDisplay();
+        </script>
+        """
+        components.html(timer_html, height=200)
+
+        # --- CLAIM BUTTON ---
+        if st.button(f"✅ Log {selected_minutes} min Session"):
+            st.session_state.study_minutes += selected_minutes
+            st.session_state.sessions_completed += 1
+            st.balloons()
+            st.rerun()
+            
+        st.caption("💡 *Click 'Log Session' only after you finish your focus time to claim your points.*")
 
         st.markdown("---")
         st.subheader("📊 Study Analytics")
