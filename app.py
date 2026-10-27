@@ -228,11 +228,11 @@ st.markdown(css, unsafe_allow_html=True)
 # ---------- THE HOOKLINE (Top Most Area) ----------
 st.markdown("""
 <div style="text-align: center; margin-top: 0.5rem; margin-bottom: 1.5rem;">
-    <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2.8rem; font-weight: 800; 
+    <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2.5rem; font-weight: 800; 
                background: -webkit-linear-gradient(45deg, #7c5cff, #00c8ff); 
                -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
                margin: 0; letter-spacing: -0.03em;">
-        Snap it. Stack it. Master it.
+        Empowering independent learning. Snap it. Stack it. Master it.
     </h1>
 </div>
 """, unsafe_allow_html=True)
@@ -1129,7 +1129,6 @@ with tab_focus:
             else:
                 mins, secs = divmod(remaining, 60)
                 
-                # JavaScript Timer (No more blinking!)
                 timer_html = f"""
                 <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
                     <div id="timer-display" style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
