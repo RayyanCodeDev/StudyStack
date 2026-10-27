@@ -651,7 +651,7 @@ def build_dot(topic, concepts, links):
 st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
 tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz = st.tabs(
-    ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Map",
+    ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Graph",
      "💬 AI Tutor", "⏱️ Focus Hub", "🧠 Metacognition Quiz"]
 )
 
