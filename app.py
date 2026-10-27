@@ -645,9 +645,9 @@ def build_dot(topic, concepts, links):
 # ---------- PAGE ----------
 st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
-tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_quiz, tab_chat, tab_focus = st.tabs(
+tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz = st.tabs(
     ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Graph",
-     "🧠 Metacognition Quiz", "💬 AI Tutor", "⏱️ Focus Hub"]
+     "💬 AI Tutor", "⏱️ Focus Hub", "🧠 Metacognition Quiz"]
 )
 
 # --- HOME ---
@@ -976,39 +976,6 @@ with tab_graph:
             st.header("Study notes & Flashcards")
             render_revision(res, st.session_state.current_set_id)
 
-# --- SMART QUIZ ---
-with tab_quiz:
-    res = st.session_state.analysis_result
-    if res is None:
-        need_upload("quiz")
-    else:
-        topic = res.get("topic", "the topic")
-        with card("quiz"):
-            st.header("Smart quiz")
-            mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True, key="quiz_mode")
-            if mode == "Multiple choice":
-                mcq_quiz(res.get("flashcards", []))
-            else:
-                st.write(f"Explain **{topic}** in your own words and get graded.")
-                answer = st.text_area("Your explanation", key="feynman_answer")
-                prompt_text = f"Explain {topic} in your own words."
-                if answer.strip():
-                    prompt_text += "\nYour explanation: " + answer
-                read_aloud(prompt_text, key="tts_feynman", scope="card_quiz")
-                if st.session_state.auth_mode == "user":
-                    st.caption("Answers of 30+ characters earn points.")
-                if st.button("Grade my answer", key="feynman_grade"):
-                    if answer.strip():
-                        with st.spinner("Grading..."):
-                            feedback = grade_answer(topic, answer)
-                        with st.container(key="speech_quiz_feedback"):
-                            st.write(feedback)
-                            read_aloud(feedback, key="tts_feynman_feedback", scope="speech_quiz_feedback")
-                        if not feedback.startswith("⚠️") and len(answer.strip()) >= 30:
-                            award("quiz", immediate=True)
-                    else:
-                        st.warning("Type an explanation first.")
-
 # --- AI TUTOR & VOICE ---
 with tab_chat:
     res = st.session_state.analysis_result
@@ -1147,3 +1114,36 @@ with tab_focus:
             st.success("🎉 Daily study goal reached! Amazing work.")
         else:
             st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
+
+# --- METACOGNITION QUIZ ---
+with tab_quiz:
+    res = st.session_state.analysis_result
+    if res is None:
+        need_upload("quiz")
+    else:
+        topic = res.get("topic", "the topic")
+        with card("quiz"):
+            st.header("🧠 Metacognition Quiz")
+            mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True, key="quiz_mode")
+            if mode == "Multiple choice":
+                mcq_quiz(res.get("flashcards", []))
+            else:
+                st.write(f"Explain **{topic}** in your own words and get graded.")
+                answer = st.text_area("Your explanation", key="feynman_answer")
+                prompt_text = f"Explain {topic} in your own words."
+                if answer.strip():
+                    prompt_text += "\nYour explanation: " + answer
+                read_aloud(prompt_text, key="tts_feynman", scope="card_quiz")
+                if st.session_state.auth_mode == "user":
+                    st.caption("Answers of 30+ characters earn points.")
+                if st.button("Grade my answer", key="feynman_grade"):
+                    if answer.strip():
+                        with st.spinner("Grading..."):
+                            feedback = grade_answer(topic, answer)
+                        with st.container(key="speech_quiz_feedback"):
+                            st.write(feedback)
+                            read_aloud(feedback, key="tts_feynman_feedback", scope="speech_quiz_feedback")
+                        if not feedback.startswith("⚠️") and len(answer.strip()) >= 30:
+                            award("quiz", immediate=True)
+                    else:
+                        st.warning("Type an explanation first.")
