@@ -1162,10 +1162,10 @@ with tab_graph:
                 graph_font = "#ffffff" if dark else "#000000"
                 net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font, directed=False)
                 net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, font={"size": 18, "color": graph_font, "face": "arial"})
-                                for i, concept in enumerate(concepts):
-                    concept_id = f"c_{i}"
-                    net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, font={"size": 16, "color": graph_font, "face": "arial"})
-                    net.add_edge(topic_name, concept_id, color="#aab4d4")
+                        for i, concept in enumerate(concepts):
+                        concept_id = f"c_{i}"
+                        net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, font={"size": 16, "color": graph_font, "face": "arial"})
+                        net.add_edge(topic_name, concept_id, color="#aab4d4")
                 
                 # ---> MAKE SURE net.set_options AND try: ARE OUTSIDE (UNINDENTED) OF THE FOR LOOP <---
                 net.set_options("""
