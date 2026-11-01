@@ -1139,6 +1139,11 @@ with tab_prog:
                 c1.markdown(f"**{icon} {who}**")
                 c2.markdown(f"**{row.get('points', 0)}** pts")
 # --- KNOWLEDGE GRAPH ---
+with tab_graph:
+    res = st.session_state.analysis_result
+    if res is None:
+        need_upload("graph")
+    else:
         with card("graph"):
             st.header("Concept map")
             topic_name = str(res.get("topic", "")).strip()
@@ -1161,11 +1166,7 @@ with tab_prog:
                     concept_id = f"c_{i}"
                     net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
                     net.add_edge(topic_name, concept_id, color="#aab4d4")
-                  
-                  
 
-                
-                # ---> MAKE SURE net.set_options AND try: ARE OUTSIDE (UNINDENTED) OF THE FOR LOOP <---
                 net.set_options("""
                 var options = {
                   "physics": {
@@ -1191,7 +1192,6 @@ with tab_prog:
                 except Exception as e:
                     st.error(f"Could not generate graph: {e}")
                   
-                
                 map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 read_aloud(map_words, key="tts_mindmap", scope="card_graph")
                 with st.expander("Read the concept map in words"):
@@ -1202,6 +1202,7 @@ with tab_prog:
         with card("flash"):
             st.header("Study notes & Flashcards")
             render_revision(res, st.session_state.current_set_id)
+          
 
 # --- AI TUTOR & VOICE ---
 with tab_chat:
