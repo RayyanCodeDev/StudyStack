@@ -851,7 +851,7 @@ with tab_lib:
             else:
                 st.caption("Open a set to export it.")
                 
-         with c2:
+        with c2:
             uploaded_vault = st.file_uploader("📂 Load Saved Vault", type=["json"], key="json_vault_loader")
             if uploaded_vault is not None:
                 if st.button("🚀 Load This Vault", key="load_vault_btn"):
