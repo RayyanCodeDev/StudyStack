@@ -1008,21 +1008,63 @@ with tab_graph:
     else:
         with card("graph"):
             st.header("Concept map")
-            topic_name = str(res.get("topic", "")).strip().lower()
+            topic_name = str(res.get("topic", "")).strip()
             concepts, seen = [], set()
+            
             for c in res.get("key_concepts", []):
                 name_c = str(c or "").strip()
-                low = name_c.lower()
-                if name_c and low != topic_name and low not in seen:
-                    seen.add(low)
+                if name_c and name_c.lower() != topic_name.lower() and name_c.lower() not in seen:
+                    seen.add(name_c.lower())
                     concepts.append(name_c)
+                    
             if concepts:
-                dot = build_dot(res.get("topic", "Topic"), concepts, res.get("relationships", []))
+                # --- PYVIS INTERACTIVE GRAPH ---
+                from pyvis.network import Network
+                import streamlit.components.v1 as components
+                
+                graph_bg = "#0e1117" if dark else "#ffffff"
+                graph_font = "#ffffff" if dark else "#000000"
+
+                net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font, directed=False)
+                
+                # Add main topic node
+                net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, font={"size": 18, "color": graph_font, "face": "arial"})
+                
+                # Add concept nodes and edges
+                for i, concept in enumerate(concepts):
+                    concept_id = f"c_{i}"
+                    net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, font={"size": 16, "color": graph_font, "face": "arial"})
+                    net.add_edge(topic_name, concept_id, color="#aab4d4")
+                
+                # Physics engine to keep it centered and web-like
+                net.set_options("""
+                var options = {
+                  "physics": {
+                    "forceAtlas2Based": {
+                      "gravitationalConstant": -100,
+                      "centralGravity": 0.01,
+                      "springLength": 100,
+                      "springConstant": 0.08
+                    },
+                    "maxVelocity": 50,
+                    "solver": "forceAtlas2Based",
+                    "timestep": 0.35,
+                    "stabilization": {"iterations": 150}
+                  }
+                }
+                """)
+                
                 try:
-                    st.graphviz_chart(dot, engine="twopi", use_container_width=True)
-                except TypeError:
-                    st.graphviz_chart(dot, use_container_width=True)
-                st.caption("Solid lines connect the topic to its concepts. Dashed lines show how concepts relate.")
+                    path = "temp_graph.html"
+                    net.save_graph(path)
+                    with open(path, 'r', encoding='utf-8') as f:
+                        html_data = f.read()
+                    components.html(html_data, height=520)
+                except Exception as e:
+                    st.error(f"Could not generate graph: {e}")
+                # -------------------------------
+
+                st.caption("You can drag the nodes around to explore the map.")
                 map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 read_aloud(map_words, key="tts_mindmap", scope="card_graph")
                 with st.expander("Read the concept map in words"):
@@ -1033,7 +1075,6 @@ with tab_graph:
         with card("flash"):
             st.header("Study notes & Flashcards")
             render_revision(res, st.session_state.current_set_id)
-
 # --- AI TUTOR & VOICE ---
 with tab_chat:
     res = st.session_state.analysis_result
