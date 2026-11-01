@@ -29,7 +29,191 @@ LOGO_HEADER = BASE_DIR / "studystack_logo_header.png"
 LOGO_LOGIN = BASE_DIR / "studystack_logo_login.png"
 FAVICON = BASE_DIR / "studystack_favicon.png"
 
-# --- NEW: Lightweight JSON Functions ---
+# --- UNIVERSAL MULTI-SECTOR PUBLIC STUDY VAULTS (Nursery/KG to FCPS & PhD) ---
+GLOBAL_MULTI_SECTOR_LIBRARY = [
+    {
+        "title": "Oxford & Cambridge Early Years: Nursery, KG & Prep Phonics & Numbers",
+        "sector": "Juniors / Early Years (Nursery, KG, Prep)",
+        "subject": "Early Learning & Phonics",
+        "sources_count": 15,
+        "summary": "Interactive early childhood learning resources featuring Jolly Phonics, Oxford Reading Tree stories, basic number recognition, shapes, and motor skills practice.",
+        "key_concepts": ["Alphabet Sounds (Phonics)", "Counting 1-100", "Basic Shapes & Colors", "Story Comprehension", "Handwriting Tracing"],
+        "flashcards": [
+            {"front": "What sound does the letter 'S' make in phonics?", "back": "The snake sound: /s/ /s/ sun."},
+            {"front": "How many sides does a triangle have?", "back": "Three sides."}
+        ],
+        "mcq": [{"q": "Which shape is round like a ball?", "options": ["Circle", "Square", "Triangle", "Rectangle"], "answer": "Circle"}]
+    },
+    {
+        "title": "Matriculation Physics (Class 9-10 Sindh & Federal Board)",
+        "sector": "Matriculation (SSC)",
+        "subject": "Physics",
+        "sources_count": 25,
+        "summary": "Board exam notes covering Physical Quantities, Kinematics, Dynamics, Turning Effect of Forces, Gravitation, and Work & Energy.",
+        "key_concepts": ["Scalar & Vector", "Newton's Laws", "Momentum", "Atmospheric Pressure", "Kinetic Energy"],
+        "flashcards": [
+            {"front": "State Newton's Second Law of Motion.", "back": "F = ma. The acceleration of an object as produced by a net force is directly proportional to the magnitude of the net force."},
+            {"front": "What is the formula for gravitational potential energy?", "back": "PE = mgh"}
+        ],
+        "mcq": [{"q": "What is the value of gravitational acceleration g on Earth?", "options": ["9.8 m/s²", "10 m/s²", "8.9 m/s²", "9.1 m/s²"], "answer": "9.8 m/s²"}]
+    },
+    {
+        "title": "Intermediate (F.Sc Part 1 & 2) Board Physics & Chemistry Master Notes",
+        "sector": "Intermediate / Board Students (HSSC)",
+        "subject": "Pre-Engineering & Pre-Medical Sciences",
+        "sources_count": 42,
+        "summary": "Sindh and Federal Board curriculum notes covering Electrostatics, Current Electricity, Atomic Spectra, Chemical Bonding, and Organic Reaction Mechanisms.",
+        "key_concepts": ["Coulomb's Law", "Gauss's Law", "Hybridization of Orbitals", "Benzene Reactions", "Thermodynamics"],
+        "flashcards": [
+            {"front": "State Gauss's Law in electrostatics.", "back": "The total electric flux through any closed surface is equal to 1/ε₀ times the total charge enclosed by that surface."},
+            {"front": "What is the hybridization of carbon atoms in ethene (C2H4)?", "back": "sp² hybridization"}
+        ],
+        "mcq": [{"q": "Which of the following is a strong electrolyte?", "options": ["NaCl solution", "Glucose solution", "Acetic acid", "Ethanol"], "answer": "NaCl solution"}]
+    },
+    {
+        "title": "CAIE O-Level Physics (5054) Master Syllabus Vault",
+        "sector": "O-Level / IGCSE",
+        "subject": "Physics",
+        "sources_count": 52,
+        "summary": "Comprehensive O-Level Physics guide covering General Physics, Thermal Physics, Waves, Electromagnetism, and Atomic Physics.",
+        "key_concepts": ["Kinematics", "Electromagnetic Induction", "Lenz's Law", "Radioactivity", "Refraction"],
+        "flashcards": [
+            {"front": "What does Faraday's Law state?", "back": "The magnitude of induced EMF is directly proportional to the rate of change of magnetic flux linkage."}
+        ],
+        "mcq": [{"q": "What is the SI unit of electrical resistance?", "options": ["Ohm (Ω)", "Volt (V)", "Ampere (A)", "Watt (W)"], "answer": "Ohm (Ω)"}]
+    },
+    {
+        "title": "CAIE O-Level Chemistry (5070) Complete Notes & Past Papers",
+        "sector": "O-Level / IGCSE",
+        "subject": "Chemistry",
+        "sources_count": 45,
+        "summary": "Full compilation of Mole Concept, Reaction Rates, Electrolysis, Organic Chemistry reactions, and Qualitative Analysis.",
+        "key_concepts": ["Mole Calculations", "Electrolysis", "Exothermic/Endothermic", "Alkanes & Alkenes"],
+        "flashcards": [
+            {"front": "Define Avogadro's Constant.", "back": "6.02 × 10^23 particles in one mole of any substance."}
+        ],
+        "mcq": [{"q": "Which gas turns limewater milky?", "options": ["Carbon Dioxide", "Oxygen", "Hydrogen", "Ammonia"], "answer": "Carbon Dioxide"}]
+    },
+    {
+        "title": "CAIE A-Level Pure Mathematics (9709) Calculus & Algebra",
+        "sector": "A-Level",
+        "subject": "Mathematics",
+        "sources_count": 40,
+        "summary": "Advanced differentiation, integration, series expansion, logarithms, and coordinate geometry for Paper 1 and Paper 3.",
+        "key_concepts": ["Chain Rule", "Integration by Parts", "Binomial Expansion", "Parametric Equations"],
+        "flashcards": [
+            {"front": "What is the derivative of ln(x)?", "back": "1 / x"},
+            {"front": "What is the integral of e^(ax)?", "back": "(1/a) * e^(ax) + C"}
+        ],
+        "mcq": [{"q": "What is the derivative of sin(x)?", "options": ["cos(x)", "-cos(x)", "sin(x)", "-sin(x)"], "answer": "cos(x)"}]
+    },
+    {
+        "title": "MBBS / Pre-Med Human Anatomy & Systems Physiology",
+        "sector": "MBBS / Medical",
+        "subject": "Medical Science",
+        "sources_count": 65,
+        "summary": "Detailed medical study set covering cardiovascular hemodynamics, neuroanatomy, renal physiology, and histology basics.",
+        "key_concepts": ["Action Potential", "Cardiac Cycle", "Nephron Filtration", "Autonomic Nervous System"],
+        "flashcards": [
+            {"front": "What is the primary pacemaker of the heart?", "back": "Sinoatrial (SA) node"},
+            {"front": "Where does blood go after leaving the right ventricle?", "back": "Pulmonary artery to the lungs"}
+        ],
+        "mcq": [{"q": "Which blood cells are responsible for oxygen transport?", "options": ["Erythrocytes (RBCs)", "Leukocytes (WBCs)", "Platelets", "Plasma proteins"], "answer": "Erythrocytes (RBCs)"}]
+    },
+    {
+        "title": "FCPS Part 1 & Part 2 Clinical Medicine & Surgery Residency Vault",
+        "sector": "FCPS / Postgraduate Medical",
+        "subject": "Advanced Medicine & Surgery",
+        "sources_count": 85,
+        "summary": "Specialized postgraduate medical reference covering CPSP exam guidelines, internal medicine protocols, surgical critical care, pathophysiology, and diagnostic algorithms.",
+        "key_concepts": ["Advanced Life Support (ACLS)", "Sepsis Management", "Endocrinology Disorders", "Pre-operative Risk Assessment"],
+        "flashcards": [
+            {"front": "What is the first-line pharmacological treatment for acute anaphylactic shock?", "back": "Intramuscular Epinephrine (Adrenaline) 0.5 mg (1:1000)."},
+            {"front": "What triad characterizes Wernicke's encephalopathy?", "back": "Ophthalmoplegia, ataxia, and confusion."}
+        ],
+        "mcq": [{"q": "What is the most common cause of community-acquired pneumonia?", "options": ["Streptococcus pneumoniae", "Mycoplasma pneumoniae", "Legionella pneumophila", "Haemophilus influenzae"], "answer": "Streptococcus pneumoniae"}]
+    },
+    {
+        "title": "Business Studies & Principles of Accounting (IGCSE / O-Level & BBA)",
+        "sector": "Business Studies & Economics",
+        "subject": "Business",
+        "sources_count": 35,
+        "summary": "Double-entry bookkeeping, financial statements, marketing mix (4Ps), break-even analysis, and human resource management.",
+        "key_concepts": ["Balance Sheet", "Break-Even Point", "Market Segmentation", "Cash Flow Forecast"],
+        "flashcards": [
+            {"front": "What is the accounting equation?", "back": "Assets = Capital + Liabilities"},
+            {"front": "What are the 4 Ps of Marketing?", "back": "Product, Price, Place, Promotion"}
+        ],
+        "mcq": [{"q": "Which of the following is a current asset?", "options": ["Inventory", "Bank Loan", "Machinery", "Land"], "answer": "Inventory"}]
+    },
+    {
+        "title": "University Computer Science: Data Structures & Algorithms",
+        "sector": "University & Engineering",
+        "subject": "Computer Science",
+        "sources_count": 50,
+        "summary": "Advanced computer science reference covering Big-O notation, sorting algorithms, hash tables, binary search trees, and graph traversal.",
+        "key_concepts": ["Time Complexity", "Depth-First Search", "Binary Search", "Dynamic Programming", "Hash Collisions"],
+        "flashcards": [
+            {"front": "What is the worst-case time complexity of Merge Sort?", "back": "O(n log n)"},
+            {"front": "What data structure uses LIFO (Last In, First Out)?", "back": "Stack"}
+        ],
+        "mcq": [{"q": "Which data structure is best suited for implementing a breadth-first search?", "options": ["Queue", "Stack", "Array", "Tree"], "answer": "Queue"}]
+    },
+    {
+        "title": "Master's Degree (MSc / MS) Advanced Artificial Intelligence & Machine Learning",
+        "sector": "Master's / Postgraduate",
+        "subject": "Computer Science & AI",
+        "sources_count": 75,
+        "summary": "Postgraduate reference covering Deep Neural Networks, Transformer Architectures, Reinforcement Learning, and Bayesian Statistics.",
+        "key_concepts": ["Attention Mechanism", "Gradient Descent", "Markov Decision Processes", "Overfitting & Regularization"],
+        "flashcards": [
+            {"front": "What is the core innovation of the Transformer architecture?", "back": "Self-attention mechanisms replacing recurrent layers for parallel processing."},
+            {"front": "Define Overfitting.", "back": "When a model learns the training data too well, capturing noise and failing to generalize on unseen data."}
+        ],
+        "mcq": [{"q": "Which activation function helps mitigate vanishing gradients in deep networks?", "options": ["ReLU", "Sigmoid", "Tanh", "Step function"], "answer": "ReLU"}]
+    },
+    {
+        "title": "PhD / Doctoral Level Quantum Information Science & Theoretical Physics",
+        "sector": "PhD / Doctorate",
+        "subject": "Theoretical Physics",
+        "sources_count": 90,
+        "summary": "Advanced doctoral research notes on Quantum Entanglement, Density Matrix Formalism, Quantum Error Correction, and EPR Paradox.",
+        "key_concepts": ["Qubit Superposition", "Bell States", "Quantum Teleportation", "decoherence", "Density Operator"],
+        "flashcards": [
+            {"front": "What does a Bell state represent?", "back": "Maximally entangled quantum states of two qubits."},
+            {"front": "What is Quantum Decoherence?", "back": "The loss of quantum coherence causing a quantum system to behave like a classical system due to environment interaction."}
+        ],
+        "mcq": [{"q": "Which theorem states that an arbitrary unknown quantum state cannot be cloned?", "options": ["No-cloning theorem", "Bell's theorem", "Ehrenfest's theorem", "Bloch theorem"], "answer": "No-cloning theorem"}]
+    },
+    {
+        "title": "Professional Certifications: ACCA & CFA Level 1 Financial Reporting",
+        "sector": "Professional & Certifications",
+        "subject": "Finance & Accounting",
+        "sources_count": 45,
+        "summary": "Corporate finance valuation metrics, IFRS standards, cash flow statements, portfolio management, and quantitative methods.",
+        "key_concepts": ["Net Present Value (NPV)", "Capital Asset Pricing Model (CAPM)", "IFRS 15 Revenue", "EBITDA"],
+        "flashcards": [
+            {"front": "What does CAPM calculate?", "back": "Expected return of an asset based on its systematic risk (beta) and expected market return."},
+            {"front": "What is EBITDA?", "back": "Earnings Before Interest, Taxes, Depreciation, and Amortization."}
+        ],
+        "mcq": [{"q": "Which financial statement reports a company's financial position at a specific point in time?", "options": ["Balance Sheet", "Income Statement", "Cash Flow Statement", "Statement of Changes in Equity"], "answer": "Balance Sheet"}]
+    },
+    {
+        "title": "Law & Jurisprudence (LLB / LLM): Constitutional & Contract Law",
+        "sector": "Law & Jurisprudence",
+        "subject": "Legal Studies",
+        "sources_count": 55,
+        "summary": "Precedent analysis, offer and acceptance doctrine, consideration, tort law negligence, and constitutional rights frameworks.",
+        "key_concepts": ["Elements of a Contract", "Duty of Care", "Judicial Review", "Breach of Contract Remedies"],
+        "flashcards": [
+            {"front": "What are the core elements of a binding contract?", "back": "Offer, acceptance, consideration, intention to create legal relations, and capacity."},
+            {"front": "What case established the modern tort law 'neighbor principle'?", "back": "Donoghue v Stevenson [1932]"}
+        ],
+        "mcq": [{"q": "What standard of proof is required in criminal law cases?", "options": ["Beyond a reasonable doubt", "Preponderance of the evidence", "Clear and convincing evidence", "Balance of probabilities"], "answer": "Beyond a reasonable doubt"}]
+    }
+]
+
+# --- Lightweight JSON Functions ---
 def export_lightweight_json(result_data):
     compressed_payload = {
         "version": "1.0",
@@ -52,14 +236,12 @@ def import_lightweight_json(uploaded_file):
         return data, None
     except Exception as e:
         return None, f"Failed to parse JSON file: {str(e)}"
-# ---------------------------------------
 
 def load_icon():
     try:
         return Image.open(FAVICON)
     except Exception:
         return "📚"
-
 
 st.set_page_config(page_title="StudyStack", page_icon=load_icon(), layout="wide")
 
@@ -99,10 +281,8 @@ for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = copy.deepcopy(v)
 
-
 def clean_name(raw):
     return re.sub(r"[^\w\s'’.-]", "", raw or "", flags=re.UNICODE).strip()[:30]
-
 
 def reset_session():
     gen = st.session_state.upload_gen + 1
@@ -110,13 +290,11 @@ def reset_session():
         st.session_state[k] = copy.deepcopy(v)
     st.session_state.upload_gen = gen
 
-
 def show_logo(path, width, fallback):
     if path.exists():
         st.image(str(path), width=width)
     else:
         st.markdown(fallback)
-
 
 # ---------- TOP BAR ----------
 _mode = st.session_state.auth_mode
@@ -257,14 +435,12 @@ def need_upload(tab_name):
     with card(f"empty_{tab_name}"):
         st.info("Upload a screenshot or PDF in the Capture tab first, or open a set from My Library.")
 
-
 def start_user_session(user):
     st.session_state.auth_mode = "user"
     st.session_state.auth_user = user
     st.session_state.user_name = clean_name(user["name"])
     st.session_state.name_asked = bool(st.session_state.user_name)
     st.rerun()
-
 
 def login_page():
     _, mid, _ = st.columns([1, 2, 1])
@@ -591,9 +767,9 @@ def mcq_quiz(flashcards):
                 award("quiz", immediate=True)
         if st.button("🔄 Restart quiz", key="mcq_restart"):
             st.session_state.mcq = None
-            st.rerun()
+          st.rerun()
         return
-    q = qs[m["i"]]
+          q = qs[m["i"]]
     st.progress(m["i"] / len(qs))
     st.caption(f"Question {m['i'] + 1} of {len(qs)} | Score: {m['score']}")
     st.subheader(q["q"])
@@ -621,33 +797,11 @@ def mcq_quiz(flashcards):
             m["checked"] = False
             st.rerun()
 
-def build_dot(topic, concepts, links):
-    esc = lambda s: str(s).replace('"', "'").replace("\\", "")
-    wrap = lambda s, w=16: "\\n".join(textwrap.wrap(esc(s), w)) or " "
-    lines = [
-        "graph G {",
-        '  graph [bgcolor="transparent", overlap=false, splines=true, ranksep=1.6, root="topic", pad=0.3];',
-        '  node  [shape=ellipse, style=filled, penwidth=0, fontname="Helvetica-Bold", fontsize=13, fontcolor="#0b1020", margin="0.18,0.10"];',
-        '  edge  [color="#8da2c0", penwidth=1.3];',
-        f'  topic [label="{wrap(topic, 18)}", fillcolor="#ff8a8a", fontsize=17, margin="0.3,0.2"];',
-    ]
-    ids = {}
-    for i, c in enumerate(concepts):
-        ids[str(c).strip().lower()] = f"c{i}"
-        lines.append(f'  c{i} [label="{wrap(c)}", fillcolor="#7ee8dc"];')
-        lines.append(f"  topic -- c{i};")
-    for link in links:
-        a = ids.get(str(link.get("from", "")).strip().lower())
-        b = ids.get(str(link.get("to", "")).strip().lower())
-        if a and b and a != b:
-            lines.append(f'  {a} -- {b} [style=dashed, color="#b79cff"];')
-    lines.append("}")
-    return "\n".join(lines)
-
 st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
-tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz = st.tabs(
-    ["🏠 Home", "📸 Capture", "📚 My Library", "🏆 Progress", "🕸️ Knowledge Graph",
+# --- ALL TABS (Original tabs + Explore Library) ---
+tab_home, tab_cap, tab_lib, tab_explore, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz = st.tabs(
+    ["🏠 Home", "📸 Capture", "📚 My Library", "🌍 Explore Library", "🏆 Progress", "🕸️ Knowledge Graph",
      "💬 AI Tutor", "⏱️ Focus Hub", "🧠 Metacognition Quiz"]
 )
 
@@ -688,7 +842,6 @@ with tab_cap:
             estimated_pages = 0
             has_error = False
 
-            # First pass: validate and collect page selections for each file
             for f in uploaded_files:
                 if f.name.lower().endswith(".pdf"):
                     data = f.getvalue()
@@ -705,10 +858,10 @@ with tab_cap:
                                                       value=min(pages, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
                             
                             if end < start:
-                                st.error(f"'To page' must be the same as or after 'From page' for {f.name}.")
+                                st.error(f"'To page' must be after 'From page' for {f.name}.")
                                 has_error = True
                             elif (end - start + 1) > MAX_PDF_PAGES:
-                                st.warning(f"Please pick at most {MAX_PDF_PAGES} pages for {f.name}. You picked {end - start + 1}.")
+                                st.warning(f"Please pick at most {MAX_PDF_PAGES} pages for {f.name}.")
                                 has_error = True
                             else:
                                 pdf_selections[fid] = (start, end)
@@ -723,14 +876,12 @@ with tab_cap:
                     valid_files.append((f, f.getvalue(), 1))
 
             if valid_files and not has_error:
-                # Estimate time: ~2 seconds per page
                 est_seconds = estimated_pages * 2
                 est_min = est_seconds // 60
                 est_sec = est_seconds % 60
-                
                 time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
 
-                st.info(f"📚 **{len(valid_files)} file(s) ready.** Estimated analysis time for **{estimated_pages} selected pages**: **{time_str}**. Grab a coffee while we work! ☕")
+                st.info(f"📚 **{len(valid_files)} file(s) ready.** Estimated analysis time for **{estimated_pages} pages**: **{time_str}**. Grab a coffee! ☕")
 
                 if st.button("🚀 Start Analysis"):
                     progress_bar = st.progress(0, text="Initializing AI...")
@@ -751,13 +902,13 @@ with tab_cap:
                             save_result(result, ("img", f.name, f.size), source=make_image_source(f))
 
                     progress_bar.progress(100, text="Analysis Complete!")
-                    st.success("🎉 All selected pages have been analyzed and added to your library!")
+                    st.success("🎉 All selected pages have been analyzed!")
                     time.sleep(1)
                     st.session_state.upload_gen += 1
                     st.rerun()
 
         elif st.session_state.source:
-            st.caption("📎 The original upload for the set you have open:")
+            st.caption("📎 Original upload for the open set:")
             show_source(st.session_state.source)
 
 # --- MY LIBRARY ---
@@ -778,30 +929,23 @@ with tab_lib:
                     st.session_state.lib_cache = None
                     st.rerun()
             elif not lib["rows"]:
-                st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here automatically.")
+                st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here.")
             else:
-                query = st.text_input("Search your library", key="library_search",
-                                      placeholder="Search titles, subjects or words inside your notes")
+                query = st.text_input("Search your library", key="library_search", placeholder="Search saved titles or notes")
                 matched = search_sets(lib["rows"], query)
-                
                 st.caption(f"Showing {len(matched)} of {len(lib['rows'])} sets.")
                 
-                # --- SUBJECT TABS WITH GRID UI ---
                 if not matched:
-                    st.info("No matching resources. Try another word or clear your search.")
+                    st.info("No matching resources.")
                 else:
-                    # Group the matched sets by subject
                     subject_groups = group_sets_by_subject(matched)
-                    
-                    # Create a tab for each subject
                     subject_tabs = st.tabs(list(subject_groups.keys()))
                     
                     for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
                         with subject_tab:
                             if not subject_rows:
-                                st.info("No resources in this subject match your search.")
+                                st.info("No resources in this subject.")
                             else:
-                                # Render the 3-column Grid
                                 cols = st.columns(3)
                                 for i, row in enumerate(subject_rows):
                                     with cols[i % 3]:
@@ -829,28 +973,18 @@ with tab_lib:
                                                     st.session_state.confirm_delete = None
                                                     st.rerun()
         else:
-            st.write("As a guest, nothing is stored on our side. Download your study set to keep it, and upload it here later to continue.")
+            st.write("As a guest, nothing is stored on our side. Download your study set to keep it.")
 
-        # --- JSON VAULT EXPORT/IMPORT ---
         st.divider()
         st.subheader("💾 Storage & Offline Vault")
-        
         c1, c2 = st.columns(2)
-        
         with c1:
             if res is not None:
                 json_data = export_lightweight_json(res)
                 safe_filename = f"{res.get('topic', 'studyset').replace(' ', '_')}_vault.json"
-                st.download_button(
-                    label="⬇️ Export Vault (JSON)",
-                    data=json_data,
-                    file_name=safe_filename,
-                    mime="application/json",
-                    help="Downloads a lightweight (<50KB) structured JSON file of your notes."
-                )
+                st.download_button("⬇️ Export Vault (JSON)", data=json_data, file_name=safe_filename, mime="application/json")
             else:
-                st.caption("Open a set to export it.")
-                
+                st.caption("Open a set to export.")
         with c2:
             uploaded_vault = st.file_uploader("📂 Load Saved Vault", type=["json"], key="json_vault_loader")
             if uploaded_vault is not None:
@@ -861,41 +995,71 @@ with tab_lib:
                     else:
                         st.session_state.analysis_result = loaded_data
                         st.success(f"Loaded: {loaded_data.get('topic')}")
-                        time.sleep(1) # Gives the user a second to see the success message
+                        time.sleep(1)
                         st.rerun()
 
-        if st.session_state.auth_mode == "guest":
-            st.divider()
-            st.subheader("Restore a saved set")
-            f = st.file_uploader("Upload a StudyStack set (.json)", type=["json"], key=f"restore_{st.session_state.upload_gen}")
-            if f is not None:
-                if f.size > MAX_RESTORE_MB * 1024 * 1024:
-                    st.error(f"That file is too large (max {MAX_RESTORE_MB} MB).")
-                else:
-                    try:
-                        payload_in = json.loads(f.getvalue().decode("utf-8"))
-                    except Exception:
-                        payload_in = None
-                    restored = clean_result(payload_in.get("result")) if isinstance(payload_in, dict) else None
-                    if restored is None:
-                        st.error("This doesn't look like a StudyStack set.")
-                    elif st.button("Load this set"):
-                        st.session_state.analysis_result = restored
-                        st.session_state.chat_history = clean_chat(payload_in.get("chat"))
-                        st.session_state.source = None
-                        st.session_state.revision_reveal = None
+# --- EXPLORE LIBRARY (Multi-Sector Public Study Hub from Nursery to FCPS & PhD) ---
+with tab_explore:
+    with card("explore_lib"):
+        st.header("🌍 Explore Multi-Sector Library")
+        st.caption("Browse pre-indexed curriculum resources spanning Nursery/KG Juniors, Matriculation, Intermediate Boards, O/A Levels, MBBS, FCPS, Undergraduate, Master's, PhD, Professional Certifications, and Law.")
+        
+        sector_filter = st.selectbox(
+            "Filter by Educational Sector", 
+            [
+                "All Sectors", 
+                "Juniors / Early Years (Nursery, KG, Prep)",
+                "Matriculation (SSC)", 
+                "Intermediate / Board Students (HSSC)",
+                "O-Level / IGCSE", 
+                "A-Level", 
+                "MBBS / Medical", 
+                "FCPS / Postgraduate Medical",
+                "Business Studies & Economics", 
+                "University & Engineering",
+                "Master's / Postgraduate",
+                "PhD / Doctorate",
+                "Professional & Certifications",
+                "Law & Jurisprudence"
+            ]
+        )
+        explore_query = st.text_input("🔍 Search subjects, courses, or keywords...", key="explore_search").lower()
+        
+        filtered_vaults = GLOBAL_MULTI_SECTOR_LIBRARY
+        if sector_filter != "All Sectors":
+            filtered_vaults = [v for v in filtered_vaults if v["sector"] == sector_filter]
+        if explore_query:
+            filtered_vaults = [
+                v for v in filtered_vaults 
+                if explore_query in v["title"].lower() 
+                or explore_query in v["subject"].lower() 
+                or explore_query in v["sector"].lower()
+                or any(explore_query in c.lower() for c in v["key_concepts"])
+            ]
+            
+        st.markdown(f"**Showing {len(filtered_vaults)} public study vaults:**")
+        
+        cols = st.columns(2)
+        for idx, vault in enumerate(filtered_vaults):
+            with cols[idx % 2]:
+                with st.container(border=True):
+                    st.markdown(f"### 📘 {vault['title']}")
+                    st.caption(f"🏫 **Sector:** {vault['sector']} · 🏷️ **Subject:** {vault['subject']} · 📄 **{vault['sources_count']} Sources**")
+                    st.write(vault["summary"])
+                    if st.button(f"🚀 Load into StudyStack Workspace", key=f"load_global_vault_{idx}"):
+                        st.session_state.analysis_result = vault
+                        st.session_state.chat_history = []
                         st.session_state.mcq = None
-                        st.session_state.current_set_id = None
-                        st.session_state.file_key = ("file", f.name, f.size)
-                        st.session_state.upload_gen += 1
-                        st.session_state.save_note = ""
+                        st.success(f"Loaded '{vault['title']}'! Check the Knowledge Graph, AI Tutor, or Quiz tabs.")
+                        time.sleep(1)
                         st.rerun()
+
 # --- PROGRESS ---
 with tab_prog:
     if st.session_state.auth_mode != "user":
         with card("prog_guest"):
             st.header("🏆 Progress")
-            st.info("Sign in to track your streak and compete with friends. Guests aren't ranked.")
+            st.info("Sign in to track your streak and compete with friends.")
     else:
         soc = get_social()
         prog = soc["progress"]
@@ -915,20 +1079,14 @@ with tab_prog:
                 if days:
                     df = pd.DataFrame({"Day": [d["day"] for d in days], "Points": [d["points"] for d in days]})
                     st.bar_chart(df, x="Day", y="Points")
-                st.caption("Earn points: +10 for a new set, +2 per tutor question, +5 per finished quiz or quiz answer "
-                           f"(30+ characters). Maximum {DAILY_CAP} a day. Study a little every day to grow your streak.")
             if st.button("Refresh", key="refresh_social"):
                 get_social(force=True)
                 st.rerun()
 
         with card("friends"):
             st.header("👥 Friends")
-            st.caption("Friends only see your display name and your weekly points. Never your email.")
-
             if soc["code"]:
-                st.write("Your friend code. Share it with classmates:")
                 st.code(soc["code"], language=None)
-
             with st.form("add_friend", clear_on_submit=True):
                 code_in = st.text_input("Add a friend with their code", placeholder="STK-AB12CD")
                 add = st.form_submit_button("Send request")
@@ -956,14 +1114,6 @@ with tab_prog:
                     if c3.button("Decline", key=f"dec_{x['id']}"):
                         friend_action(respond_request, x["id"], False)
 
-            if outgoing:
-                st.subheader("Waiting for a reply")
-                for x in outgoing:
-                    c1, c2 = st.columns([5, 1.6])
-                    c1.markdown(f"⏳ **{clean_name(x['name']) or 'Student'}**")
-                    if c2.button("Cancel", key=f"can_{x['id']}"):
-                        friend_action(remove_friend, x["id"])
-
             if accepted:
                 st.subheader("Your friends")
                 for x in accepted:
@@ -973,23 +1123,10 @@ with tab_prog:
                     if c2.button("Remove", key=f"rm_{x['id']}"):
                         st.session_state.confirm_remove = x["id"]
                         st.rerun()
-                    if st.session_state.confirm_remove == x["id"]:
-                        st.warning(f"Remove {nm} from your friends?")
-                        y, n, _ = st.columns([1.5, 1, 4])
-                        if y.button("Yes, remove", key=f"rmy_{x['id']}"):
-                            friend_action(remove_friend, x["id"])
-                        if n.button("Cancel", key=f"rmn_{x['id']}"):
-                            st.session_state.confirm_remove = None
-                            st.rerun()
-            elif not incoming and not outgoing:
-                st.info("No friends yet. Share your code, or enter a classmate's code above.")
 
         with card("board"):
             st.header("🏅 Weekly leaderboard")
-            st.caption("You and your friends only. Resets every Monday.")
             board = soc["board"]
-            if len(board) <= 1:
-                st.info("Add friends to start competing. Once they accept, you'll all appear here.")
             medals = ["🥇", "🥈", "🥉"]
             for i, row in enumerate(board):
                 icon = medals[i] if i < 3 else f"{i + 1}."
@@ -1010,7 +1147,6 @@ with tab_graph:
             st.header("Concept map")
             topic_name = str(res.get("topic", "")).strip()
             concepts, seen = [], set()
-            
             for c in res.get("key_concepts", []):
                 name_c = str(c or "").strip()
                 if name_c and name_c.lower() != topic_name.lower() and name_c.lower() not in seen:
@@ -1018,25 +1154,18 @@ with tab_graph:
                     concepts.append(name_c)
                     
             if concepts:
-                # --- PYVIS INTERACTIVE GRAPH ---
                 from pyvis.network import Network
                 import streamlit.components.v1 as components
-                
                 graph_bg = "#0e1117" if dark else "#ffffff"
                 graph_font = "#ffffff" if dark else "#000000"
-
                 net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font, directed=False)
-                
-                # Add main topic node
                 net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, font={"size": 18, "color": graph_font, "face": "arial"})
-                
-                # Add concept nodes and edges
-                for i, concept in enumerate(concepts):
+                                for i, concept in enumerate(concepts):
                     concept_id = f"c_{i}"
                     net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, font={"size": 16, "color": graph_font, "face": "arial"})
                     net.add_edge(topic_name, concept_id, color="#aab4d4")
                 
-                # Physics engine to keep it centered and web-like
+                # ---> MAKE SURE net.set_options AND try: ARE OUTSIDE (UNINDENTED) OF THE FOR LOOP <---
                 net.set_options("""
                 var options = {
                   "physics": {
@@ -1053,7 +1182,6 @@ with tab_graph:
                   }
                 }
                 """)
-                
                 try:
                     path = "temp_graph.html"
                     net.save_graph(path)
@@ -1062,19 +1190,19 @@ with tab_graph:
                     components.html(html_data, height=520)
                 except Exception as e:
                     st.error(f"Could not generate graph: {e}")
-                # -------------------------------
-
-                st.caption("You can drag the nodes around to explore the map.")
+                  
+                
                 map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 read_aloud(map_words, key="tts_mindmap", scope="card_graph")
                 with st.expander("Read the concept map in words"):
                     st.text(map_words)
             else:
-                st.info("No key concepts were found in this material.")
+                st.info("No key concepts were found.")
 
         with card("flash"):
             st.header("Study notes & Flashcards")
             render_revision(res, st.session_state.current_set_id)
+
 # --- AI TUTOR & VOICE ---
 with tab_chat:
     res = st.session_state.analysis_result
@@ -1087,12 +1215,11 @@ with tab_chat:
 
         with card("chat"):
             st.header("AI Tutor & Voice Hub")
-            st.caption("StudyStack is an AI and can make mistakes. Double-check important facts, especially before exams.")
             if not st.session_state.name_asked:
                 with st.chat_message("assistant"):
                     st.markdown("Hi! I'm your StudyStack tutor 👋 What should I call you?")
                 with st.form("name_form", clear_on_submit=True):
-                    n = st.text_input("Your name", max_chars=30, placeholder="e.g. Ayesha")
+                    n = st.text_input("Your name", max_chars=30, placeholder="e.g. Asim")
                     c1, c2, _ = st.columns([1, 1, 4])
                     go = c1.form_submit_button("Continue")
                     skip = c2.form_submit_button("Skip")
@@ -1100,73 +1227,44 @@ with tab_chat:
                     cleaned = clean_name(n)
                     if cleaned:
                         st.session_state.user_name = cleaned
-                        if st.session_state.auth_mode == "user" and st.session_state.auth_user:
-                            st.session_state.auth_user["name"] = cleaned
                         st.session_state.name_asked = True
                         st.rerun()
                 if skip:
-                    st.session_state.user_name = ""
                     st.session_state.name_asked = True
                     st.rerun()
             else:
-                st.write("Ask by text, or record your voice to ask a question or explain a concept out loud.")
-
-                audio = st.audio_input("🎙️ Record a voice question or Feynman explanation",
-                                       key=f"voice_{st.session_state.voice_gen}")
+                audio = st.audio_input("🎙️ Record a voice question", key=f"voice_{st.session_state.voice_gen}")
                 if audio is not None:
                     st.audio(audio)
                     if st.button("🚀 Process voice message", key="voice_go"):
                         if audio.size > MAX_AUDIO_MB * 1024 * 1024:
-                            st.error(f"That recording is too long (max {MAX_AUDIO_MB} MB). Try a shorter one.")
+                            st.error("Recording too large.")
                         else:
-                            with st.spinner("Listening and evaluating your audio..."):
+                            with st.spinner("Listening..."):
                                 reply = evaluate_voice(audio.getvalue(), context, name)
-                            if reply.startswith("⚠️"):
-                                st.warning(reply)
-                            else:
-                                st.session_state.chat_history.append({"role": "user", "content": "🎙️ *[Spoken voice message]*"})
-                                st.session_state.chat_history.append({"role": "assistant", "content": reply})
-                                persist_chat()
-                                award("tutor")
-                                st.session_state.voice_gen += 1
-                                st.rerun()
+                            st.session_state.chat_history.append({"role": "user", "content": "🎙️ *[Voice message]*"})
+                            st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                            persist_chat()
+                            award("tutor")
+                            st.session_state.voice_gen += 1
+                            st.rerun()
 
-                st.markdown("---")
-                if not st.session_state.chat_history:
-                    hello = f"Nice to meet you, {name}! " if name else "Hi there! "
-                    with st.chat_message("assistant"):
-                        st.markdown(f"{hello}Ask me anything about **{topic}**, or try: \"Explain this like I'm 5\".")
                 for m in st.session_state.chat_history:
                     with st.chat_message(m["role"]):
                         st.markdown(m["content"])
 
                 with st.form("chat_form", clear_on_submit=True):
-                    q = st.text_input("Ask about the material", placeholder="Type your question and press Enter")
+                    q = st.text_input("Ask about the material", placeholder="Type your question")
                     sent = st.form_submit_button("Ask")
 
-                if sent:
-                    if q.strip():
-                        with st.spinner("Thinking..."):
-                            reply = chat_with_notes(q, context, st.session_state.chat_history, name)
-                        if reply.startswith("⚠️"):
-                            st.warning(reply)
-                        else:
-                            st.session_state.chat_history.append({"role": "user", "content": q})
-                            st.session_state.chat_history.append({"role": "assistant", "content": reply})
-                            persist_chat()
-                            if len(q.strip()) >= 5:
-                                award("tutor")
-                            st.rerun()
-                    else:
-                        st.warning("Type a question first.")
-
-                b1, b2, _ = st.columns([1, 1, 4])
-                if st.session_state.chat_history and b1.button("Clear chat", key="clear_chat"):
-                    st.session_state.chat_history = []
+                if sent and q.strip():
+                    with st.spinner("Thinking..."):
+                        reply = chat_with_notes(q, context, st.session_state.chat_history, name)
+                    st.session_state.chat_history.append({"role": "user", "content": q})
+                    st.session_state.chat_history.append({"role": "assistant", "content": reply})
                     persist_chat()
-                    st.rerun()
-                if b2.button("Change name"):
-                    st.session_state.name_asked = False
+                    if len(q.strip()) >= 5:
+                        award("tutor")
                     st.rerun()
 
 # --- FOCUS HUB ---
@@ -1177,23 +1275,14 @@ with tab_focus:
             st.session_state.focus_timer_state = "idle"
         if "focus_timer_end" not in st.session_state:
             st.session_state.focus_timer_end = 0
-        if "focus_timer_remaining" not in st.session_state:
-            st.session_state.focus_timer_remaining = 0
-        if "focus_timer_mins" not in st.session_state:
-            st.session_state.focus_timer_mins = 25
 
         if st.session_state.focus_timer_state == "idle":
-            st.write("Stay locked in. Choose your study mode, track your focus time, and build your daily study streak.")
             col1, col2 = st.columns(2)
             with col1:
-                session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"],
-                                            key="focus_hub_study_mode")
+                session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"])
             with col2:
-                st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
-            st.markdown("---")
+                st.metric("Total Focus Time", f"{st.session_state.study_minutes} mins")
             selected_minutes = 25 if session_type == "Deep Work Pomodoro (25m)" else (30 if session_type == "Shallow Work (30m)" else 10)
-            st.write(f"Ready to focus for **{selected_minutes} minutes**?")
-            st.caption("⚠️ *Warning: You must stay on this tab for the entire duration. If you switch tabs or refresh, the session will reset.*")
             if st.button("🚀 Start Focus Session"):
                 st.session_state.focus_timer_state = "running"
                 st.session_state.focus_timer_end = time.time() + (selected_minutes * 60)
@@ -1206,69 +1295,15 @@ with tab_focus:
                 st.session_state.sessions_completed += 1
                 st.session_state.focus_timer_state = "idle"
                 st.balloons()
-                st.success(f"🎉 Session complete! +{st.session_state.focus_timer_mins} minutes added to your focus time.")
-                time.sleep(3)
+                st.success("🎉 Session complete!")
+                time.sleep(2)
                 st.rerun()
             else:
                 mins, secs = divmod(remaining, 60)
-                timer_html = f"""
-                <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
-                    <div id="timer-display" style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
-                    <p style="color: #aab4d4;">Focusing...</p>
-                </div>
-                <script>
-                    let timeLeft = {remaining};
-                    function updateDisplay() {{
-                        let m = Math.floor(timeLeft / 60);
-                        let s = timeLeft % 60;
-                        document.getElementById('timer-display').innerText = String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
-                        if (timeLeft > 0) {{
-                            timeLeft--;
-                            setTimeout(updateDisplay, 1000);
-                        }}
-                    }}
-                    setTimeout(updateDisplay, 1000);
-                </script>
-                """
-                components.html(timer_html, height=220)
-                st.info("💡 You can safely switch tabs. The timer will keep running in the background.")
-                c1, c2 = st.columns(2)
-                if c1.button("⏸️ Pause Timer"):
-                    st.session_state.focus_timer_state = "paused"
-                    st.session_state.focus_timer_remaining = remaining
-                    st.rerun()
-                if c2.button("🛑 Stop & Reset"):
+                st.markdown(f"### ⏳ {mins:02d}:{secs:02d} remaining")
+                if st.button("🛑 Stop & Reset"):
                     st.session_state.focus_timer_state = "idle"
                     st.rerun()
-        elif st.session_state.focus_timer_state == "paused":
-            remaining = st.session_state.focus_timer_remaining
-            mins, secs = divmod(remaining, 60)
-            st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
-                <div style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
-                <p style="color: #aab4d4;">Paused</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.info("⏸️ Timer Paused. You can safely visit other tabs.")
-            c1, c2 = st.columns(2)
-            if c1.button("▶️ Resume Timer"):
-                st.session_state.focus_timer_end = time.time() + remaining
-                st.session_state.focus_timer_state = "running"
-                st.rerun()
-            if c2.button("🛑 Stop & Reset"):
-                st.session_state.focus_timer_state = "idle"
-                st.rerun()
-
-        st.markdown("---")
-        st.subheader("📊 Study Analytics")
-        st.write(f"**Completed Sessions Today:** {st.session_state.sessions_completed}")
-        progress_val = min(st.session_state.study_minutes / 120.0, 1.0)
-        st.write("Daily Goal Progress (Target: 120 mins):")
-        st.progress(progress_val)
-        if st.session_state.study_minutes >= 120:
-            st.success("🎉 Daily study goal reached! Amazing work.")
-        else:
-            st.caption(f"Keep going! {max(0, 120 - st.session_state.study_minutes)} mins left to hit your daily goal.")
 
 # --- METACOGNITION QUIZ ---
 with tab_quiz:
@@ -1279,69 +1314,21 @@ with tab_quiz:
         topic = res.get("topic", "the topic")
         with card("quiz"):
             st.header("🧠 Metacognition Quiz")
-            mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True, key="quiz_mode")
+            mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True)
             if mode == "Multiple choice":
                 mcq_quiz(res.get("flashcards", []))
             else:
-                st.write(f"Explain **{topic}** in your own words and get graded.")
+                st.write(f"Explain **{topic}** in your own words.")
                 answer = st.text_area("Your explanation", key="feynman_answer")
-                
-                components.html(
-                    """
-                    <style>
-                    body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
-                    .copy-btn {
-                        background: rgba(255, 255, 255, 0.05);
-                        border: 1px solid rgba(255, 255, 255, 0.15);
-                        color: #f2f5ff;
-                        border-radius: 999px;
-                        padding: 8px 16px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        font-family: 'Plus Jakarta Sans', sans-serif;
-                        transition: 0.3s;
-                        width: 100%;
-                        text-align: center;
-                    }
-                    .copy-btn:hover {
-                        background: rgba(255, 255, 255, 0.15);
-                    }
-                    </style>
-                    <button class="copy-btn" onclick="copyText()">📋 Copy Explanation</button>
-                    <script>
-                    function copyText() {
-                        const textareas = window.parent.document.querySelectorAll('textarea');
-                        if (textareas.length > 0) {
-                            const target = textareas[textareas.length - 1];
-                            if (target && target.value) {
-                                navigator.clipboard.writeText(target.value).then(() => {
-                                    alert("✅ Copied to clipboard!");
-                                });
-                            } else {
-                                alert("⚠️ Your explanation is empty.");
-                            }
-                        }
-                    }
-                    </script>
-                    """,
-                    height=45
-                )
-
-                prompt_text = f"Explain {topic} in your own words."
-                if answer.strip():
-                    prompt_text += "\nYour explanation: " + answer
-                read_aloud(prompt_text, key="tts_feynman", scope="card_quiz")
-                if st.session_state.auth_mode == "user":
-                    st.caption("Answers of 30+ characters earn points.")
                 if st.button("Grade my answer", key="feynman_grade"):
                     if answer.strip():
                         with st.spinner("Grading..."):
                             feedback = grade_answer(topic, answer)
-                        with st.container(key="speech_quiz_feedback"):
-                            st.write(feedback)
-                            read_aloud(feedback, key="tts_feynman_feedback", scope="speech_quiz_feedback")
-                        if not feedback.startswith("⚠️") and len(answer.strip()) >= 30:
+                        st.write(feedback)
+                        if len(answer.strip()) >= 30:
                             award("quiz", immediate=True)
                     else:
                         st.warning("Type an explanation first.")
+                      
+      
+      
