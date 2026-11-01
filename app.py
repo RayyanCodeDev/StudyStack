@@ -1139,7 +1139,7 @@ with tab_prog:
                 c1.markdown(f"**{icon} {who}**")
                 c2.markdown(f"**{row.get('points', 0)}** pts")
 # --- KNOWLEDGE GRAPH ---
-                      with card("graph"):
+        with card("graph"):
             st.header("Concept map")
             topic_name = str(res.get("topic", "")).strip()
             concepts, seen = [], set()
