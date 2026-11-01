@@ -851,16 +851,18 @@ with tab_lib:
             else:
                 st.caption("Open a set to export it.")
                 
-        with c2:
+         with c2:
             uploaded_vault = st.file_uploader("📂 Load Saved Vault", type=["json"], key="json_vault_loader")
-            if uploaded_vault:
-                loaded_data, err = import_lightweight_json(uploaded_vault)
-                if err:
-                    st.error(err)
-                else:
-                    st.session_state.analysis_result = loaded_data
-                    st.success(f"Loaded: {loaded_data.get('topic')}")
-                    st.rerun()
+            if uploaded_vault is not None:
+                if st.button("🚀 Load This Vault", key="load_vault_btn"):
+                    loaded_data, err = import_lightweight_json(uploaded_vault)
+                    if err:
+                        st.error(err)
+                    else:
+                        st.session_state.analysis_result = loaded_data
+                        st.success(f"Loaded: {loaded_data.get('topic')}")
+                        time.sleep(1) # Gives the user a second to see the success message
+                        st.rerun()
 
         if st.session_state.auth_mode == "guest":
             st.divider()
