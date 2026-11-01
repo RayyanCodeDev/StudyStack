@@ -1138,39 +1138,32 @@ with tab_prog:
                 c1, c2 = st.columns([5, 1.6])
                 c1.markdown(f"**{icon} {who}**")
                 c2.markdown(f"**{row.get('points', 0)}** pts")
-
 # --- KNOWLEDGE GRAPH ---
-with tab_graph:
-    res = st.session_state.analysis_result
-    if res is None:
-        need_upload("graph")
-    else:
-        with card("graph"):
+                      with card("graph"):
             st.header("Concept map")
             topic_name = str(res.get("topic", "")).strip()
             concepts, seen = [], set()
             for c in res.get("key_concepts", []):
                 name_c = str(c or "").strip()
-                if name_c and name_c.lower() != topic_name.lower() and name_c.lower() not in seen:
+                if name_c and name_c.lower() != topic_name.lower():
                     seen.add(name_c.lower())
                     concepts.append(name_c)
-                    
-                            if concepts:
-            from pyvis.network import Network
-            import streamlit.components.v1 as components
-            graph_bg = "#0e1117" if dark else "#ffffff"
-            graph_font = "#ffffff" if dark else "#000000"
-            net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font)
-            net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, title=topic_name)
             
-            for i, concept in enumerate(concepts):
-                concept_id = f"c_{i}"
-                net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
-                net.add_edge(topic_name, concept_id, color="#aab4d4")
-              
+            if concepts:
+                from pyvis.network import Network
+                import streamlit.components.v1 as components
+                graph_bg = "#0e1117" if dark else "#ffffff"
+                graph_font = "#ffffff" if dark else "#000000"
+                net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font)
+                net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, title=topic_name)
+                
+                for i, concept in enumerate(concepts):
+                    concept_id = f"c_{i}"
+                    net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
+                    net.add_edge(topic_name, concept_id, color="#aab4d4")
+                  
+                  
 
-        net.add_edge(topic_name, concept_id, color="#aab4d4")
-      
                 
                 # ---> MAKE SURE net.set_options AND try: ARE OUTSIDE (UNINDENTED) OF THE FOR LOOP <---
                 net.set_options("""
