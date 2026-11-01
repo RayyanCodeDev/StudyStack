@@ -786,33 +786,48 @@ with tab_lib:
                 
                 st.caption(f"Showing {len(matched)} of {len(lib['rows'])} sets.")
                 
-                # --- NOTEBOOKLM GRID UI ---
-                cols = st.columns(3)
-                for i, row in enumerate(matched):
-                    with cols[i % 3]:
-                        with st.container(border=True):
-                            st.subheader(row['title'])
-                            st.caption(f"📅 {str(row['created_at'])[:10]}")
-                            st.caption(f"📚 {row.get('subject', 'General')}")
-                            
-                            c1, c2 = st.columns(2)
-                            if c1.button("Open", key=f"open_{row['id']}", use_container_width=True):
-                                open_saved(row["id"], row["title"])
-                            if c2.button("Delete", key=f"del_{row['id']}", use_container_width=True):
-                                st.session_state.confirm_delete = row["id"]
-                                st.rerun()
+                # --- SUBJECT TABS WITH GRID UI ---
+                if not matched:
+                    st.info("No matching resources. Try another word or clear your search.")
+                else:
+                    # Group the matched sets by subject
+                    subject_groups = group_sets_by_subject(matched)
+                    
+                    # Create a tab for each subject
+                    subject_tabs = st.tabs(list(subject_groups.keys()))
+                    
+                    for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
+                        with subject_tab:
+                            if not subject_rows:
+                                st.info("No resources in this subject match your search.")
+                            else:
+                                # Render the 3-column Grid
+                                cols = st.columns(3)
+                                for i, row in enumerate(subject_rows):
+                                    with cols[i % 3]:
+                                        with st.container(border=True):
+                                            st.subheader(row['title'])
+                                            st.caption(f"📅 {str(row['created_at'])[:10]}")
+                                            st.caption(f"📚 {row.get('subject', 'General')}")
+                                            
+                                            c1, c2 = st.columns(2)
+                                            if c1.button("Open", key=f"open_{row['id']}", use_container_width=True):
+                                                open_saved(row["id"], row["title"])
+                                            if c2.button("Delete", key=f"del_{row['id']}", use_container_width=True):
+                                                st.session_state.confirm_delete = row["id"]
+                                                st.rerun()
 
-                            if st.session_state.confirm_delete == row["id"]:
-                                st.warning(f"Delete “{row['title']}”?")
-                                y, n = st.columns(2)
-                                if y.button("Yes", key=f"yes_{row['id']}"):
-                                    delete_set(row["id"])
-                                    st.session_state.confirm_delete = None
-                                    st.session_state.lib_cache = None
-                                    st.rerun()
-                                if n.button("No", key=f"no_{row['id']}"):
-                                    st.session_state.confirm_delete = None
-                                    st.rerun()
+                                            if st.session_state.confirm_delete == row["id"]:
+                                                st.warning(f"Delete “{row['title']}”?")
+                                                y, n = st.columns(2)
+                                                if y.button("Yes", key=f"yes_{row['id']}"):
+                                                    delete_set(row["id"])
+                                                    st.session_state.confirm_delete = None
+                                                    st.session_state.lib_cache = None
+                                                    st.rerun()
+                                                if n.button("No", key=f"no_{row['id']}"):
+                                                    st.session_state.confirm_delete = None
+                                                    st.rerun()
         else:
             st.write("As a guest, nothing is stored on our side. Download your study set to keep it, and upload it here later to continue.")
 
@@ -873,7 +888,6 @@ with tab_lib:
                         st.session_state.upload_gen += 1
                         st.session_state.save_note = ""
                         st.rerun()
-
 # --- PROGRESS ---
 with tab_prog:
     if st.session_state.auth_mode != "user":
