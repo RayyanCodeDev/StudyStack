@@ -676,62 +676,86 @@ with tab_home:
 with tab_cap:
     with card("upload"):
         st.header("📸 Capture")
-        
-        # Multiple file upload enabled
-        uploaded_files = st.file_uploader("Upload screenshots or PDFs", 
-                                          type=["png", "jpg", "jpeg", "pdf"], 
+
+        uploaded_files = st.file_uploader("Upload screenshots or PDFs",
+                                          type=["png", "jpg", "jpeg", "pdf"],
                                           accept_multiple_files=True,
                                           key=f"uploader_{st.session_state.upload_gen}")
 
         if uploaded_files:
-            total_pages = 0
             valid_files = []
-            
+            pdf_selections = {}
+            estimated_pages = 0
+            has_error = False
+
+            # First pass: validate and collect page selections for each file
             for f in uploaded_files:
                 if f.name.lower().endswith(".pdf"):
                     data = f.getvalue()
                     pages = pdf_page_count(data) or 1
                     if f.size > MAX_PDF_MB * 1024 * 1024:
                         st.error(f"❌ {f.name} is larger than {MAX_PDF_MB} MB. Skipping.")
+                        has_error = True
                     else:
-                        total_pages += pages
-                        valid_files.append((f, data, pages))
+                        fid = f"{f.name}_{f.size}"
+                        if pages > 1:
+                            c1, c2, _ = st.columns([1, 1, 3])
+                            start = int(c1.number_input(f"From page ({f.name})", min_value=1, max_value=pages, value=1, step=1, key=f"from_{fid}"))
+                            end = int(c2.number_input(f"To page ({f.name})", min_value=1, max_value=pages,
+                                                      value=min(pages, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
+                            
+                            if end < start:
+                                st.error(f"'To page' must be the same as or after 'From page' for {f.name}.")
+                                has_error = True
+                            elif (end - start + 1) > MAX_PDF_PAGES:
+                                st.warning(f"Please pick at most {MAX_PDF_PAGES} pages for {f.name}. You picked {end - start + 1}.")
+                                has_error = True
+                            else:
+                                pdf_selections[fid] = (start, end)
+                                estimated_pages += (end - start + 1)
+                                valid_files.append((f, data, pages))
+                        else:
+                            pdf_selections[fid] = (1, 1)
+                            estimated_pages += 1
+                            valid_files.append((f, data, pages))
                 else:
-                    total_pages += 1
+                    estimated_pages += 1
                     valid_files.append((f, f.getvalue(), 1))
 
-            if valid_files:
+            if valid_files and not has_error:
                 # Estimate time: ~2 seconds per page
-                est_seconds = total_pages * 2
+                est_seconds = estimated_pages * 2
                 est_min = est_seconds // 60
                 est_sec = est_seconds % 60
                 
                 time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
-                
-                st.info(f"📚 **{len(valid_files)} file(s) detected ({total_pages} pages).** Estimated analysis time: **{time_str}**. Grab a coffee while we work! ☕")
-                
+
+                st.info(f"📚 **{len(valid_files)} file(s) ready.** Estimated analysis time for **{estimated_pages} selected pages**: **{time_str}**. Grab a coffee while we work! ☕")
+
                 if st.button("🚀 Start Analysis"):
                     progress_bar = st.progress(0, text="Initializing AI...")
                     file_count = len(valid_files)
-                    
+
                     for idx, (f, data, pages) in enumerate(valid_files):
                         progress_val = int((idx / file_count) * 100)
                         progress_bar.progress(progress_val, text=f"Analyzing {f.name} ({idx+1}/{file_count})...")
-                        
+
                         if f.name.lower().endswith(".pdf"):
-                            sliced = pdf_slice(data, 1, min(pages, MAX_PDF_PAGES))
+                            fid = f"{f.name}_{f.size}"
+                            start, end = pdf_selections[fid]
+                            sliced = pdf_slice(data, start, end)
                             result = analyze_pdf(sliced)
-                            save_result(result, ("pdf", f.name, f.size, 1, min(pages, MAX_PDF_PAGES)), source=make_pdf_source(f.name, 1, min(pages, MAX_PDF_PAGES), sliced))
+                            save_result(result, ("pdf", f.name, f.size, start, end), source=make_pdf_source(f.name, start, end, sliced))
                         else:
                             result = analyze_image(f)
                             save_result(result, ("img", f.name, f.size), source=make_image_source(f))
-                    
+
                     progress_bar.progress(100, text="Analysis Complete!")
-                    st.success("🎉 All files have been analyzed and added to your library!")
+                    st.success("🎉 All selected pages have been analyzed and added to your library!")
                     time.sleep(1)
                     st.session_state.upload_gen += 1
                     st.rerun()
-                    
+
         elif st.session_state.source:
             st.caption("📎 The original upload for the set you have open:")
             show_source(st.session_state.source)
