@@ -1155,17 +1155,20 @@ with tab_graph:
                     seen.add(name_c.lower())
                     concepts.append(name_c)
                     
-            if concepts:
-    from pyvis.network import Network
-    import streamlit.components.v1 as components
-    graph_bg = "#0e1117" if dark else "#ffffff"
-    graph_font = "#ffffff" if dark else "#000000"
-    net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font)
-    net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, title=topic_name)
-    
-    for i, concept in enumerate(concepts):
-        concept_id = f"c_{i}"
-        net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
+                            if concepts:
+            from pyvis.network import Network
+            import streamlit.components.v1 as components
+            graph_bg = "#0e1117" if dark else "#ffffff"
+            graph_font = "#ffffff" if dark else "#000000"
+            net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font)
+            net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, title=topic_name)
+            
+            for i, concept in enumerate(concepts):
+                concept_id = f"c_{i}"
+                net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
+                net.add_edge(topic_name, concept_id, color="#aab4d4")
+              
+
         net.add_edge(topic_name, concept_id, color="#aab4d4")
       
                 
