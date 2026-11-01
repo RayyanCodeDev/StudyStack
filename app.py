@@ -16,7 +16,7 @@ from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_w
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
-                             load_set, save_set, update_chat, group_sets_by_subject, review_saved_card)
+                             load_set, save_set, update_chat, group_sets_by_subject, search_sets, review_saved_card)
 from backend.revision import (RATINGS, apply_review, card_id, due_cards, flashcards,
                               interval_label, parse_due, schedule_review)
 from backend.offline_flashcards import build_offline_flashcards, offline_filename
@@ -29,6 +29,30 @@ LOGO_HEADER = BASE_DIR / "studystack_logo_header.png"
 LOGO_LOGIN = BASE_DIR / "studystack_logo_login.png"
 FAVICON = BASE_DIR / "studystack_favicon.png"
 
+# --- NEW: Lightweight JSON Functions ---
+def export_lightweight_json(result_data):
+    compressed_payload = {
+        "version": "1.0",
+        "topic": result_data.get("topic", "General Study Set"),
+        "subject": result_data.get("subject", "General"),
+        "summary": result_data.get("summary", ""),
+        "detailed_notes": result_data.get("detailed_notes", ""),
+        "key_concepts": result_data.get("key_concepts", []),
+        "flashcards": result_data.get("flashcards", []),
+        "quiz": result_data.get("mcq", [])
+    }
+    return json.dumps(compressed_payload, indent=2, ensure_ascii=False)
+
+def import_lightweight_json(uploaded_file):
+    try:
+        content = uploaded_file.read().decode("utf-8")
+        data = json.loads(content)
+        if "topic" not in data or "flashcards" not in data:
+            return None, "Invalid file format: Missing StudyStack schema keys."
+        return data, None
+    except Exception as e:
+        return None, f"Failed to parse JSON file: {str(e)}"
+# ---------------------------------------
 
 def load_icon():
     try:
@@ -40,33 +64,33 @@ def load_icon():
 st.set_page_config(page_title="StudyStack", page_icon=load_icon(), layout="wide")
 
 MAX_PDF_MB = 20
-MAX_PDF_PAGES = 30  # pages analyzed at once (keeps results good and free-tier usage low)
+MAX_PDF_PAGES = 30
 MAX_RESTORE_MB = 2
 
 DEFAULTS = {
     "analysis_result": None,
     "file_key": None,
-    "source": None,          # the original screenshot / PDF of the open set
+    "source": None,
     "chat_history": [],
-    "mcq": None,             # state of the multiple-choice quiz
-    "study_minutes": 25,     # Focus Hub
-    "sessions_completed": 2, # Focus Hub
-    "focus_timer_state": "idle", # "idle", "running", "paused"
+    "mcq": None,
+    "study_minutes": 25,
+    "sessions_completed": 2,
+    "focus_timer_state": "idle",
     "focus_timer_end": 0,
     "focus_timer_remaining": 0,
     "focus_timer_mins": 25,
-    "voice_gen": 0,          # changing this empties the voice recorder
+    "voice_gen": 0,
     "user_name": "",
     "name_asked": False,
-    "auth_mode": None,       # None = not chosen yet, "user" or "guest"
+    "auth_mode": None,
     "auth_user": None,
-    "upload_gen": 0,         # changing this resets the file uploaders
-    "current_set_id": None,  # library row the current work is saved in (signed-in users only)
-    "lib_cache": None,       # cached library list, None = reload from the database
+    "upload_gen": 0,
+    "current_set_id": None,
+    "lib_cache": None,
     "save_note": "",
     "confirm_delete": None,
-    "social": None,          # cached progress / friends / leaderboard, None = reload
-    "flash": "",             # one-time message shown after a rerun (e.g. "+2 points")
+    "social": None,
+    "flash": "",
     "friend_msg": None,
     "confirm_remove": None,
     "revision_reveal": None,
@@ -77,12 +101,10 @@ for k, v in DEFAULTS.items():
 
 
 def clean_name(raw):
-    """Keep letters (any language), digits, spaces and a few name symbols; max 30 chars."""
     return re.sub(r"[^\w\s'’.-]", "", raw or "", flags=re.UNICODE).strip()[:30]
 
 
 def reset_session():
-    """Forget everything about the current visitor (used on sign out)."""
     gen = st.session_state.upload_gen + 1
     for k, v in DEFAULTS.items():
         st.session_state[k] = copy.deepcopy(v)
@@ -90,14 +112,13 @@ def reset_session():
 
 
 def show_logo(path, width, fallback):
-    """Show a logo image, or a plain text title if the file isn't in the repo."""
     if path.exists():
         st.image(str(path), width=width)
     else:
         st.markdown(fallback)
 
 
-# ---------- TOP BAR (logo, name, sign in/out, dark mode) ----------
+# ---------- TOP BAR ----------
 _mode = st.session_state.auth_mode
 if _mode is None:
     _, tog_col = st.columns([5, 1.8], vertical_alignment="center")
@@ -108,16 +129,13 @@ else:
     with logo_col:
         show_logo(LOGO_HEADER, 250, "## 📚 StudyStack")
     with name_col:
-        # --- FIXED NAME LOGIC ---
         display_name = st.session_state.user_name
         if not display_name and _mode == "user" and st.session_state.auth_user:
             display_name = clean_name(st.session_state.auth_user['name'])
-            
         if display_name:
             st.markdown(f"👤 **{display_name}**")
         else:
             st.markdown("👤 **Guest**")
-        # ------------------------
     with btn_col:
         if _mode == "user":
             if st.button("Sign out", key="btn_signout"):
@@ -153,7 +171,6 @@ CSS = """
 #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"]{visibility:hidden;}
 header[data-testid="stHeader"]{background:transparent;}
 
-/* Backdrop: colored light orbs give the glass something to blur */
 .stApp{
   background:
     radial-gradient(circle at 12% 18%, __O1__ 0, transparent 38%),
@@ -168,7 +185,6 @@ header[data-testid="stHeader"]{background:transparent;}
 .stApp h1{font-weight:800;letter-spacing:-0.02em;}
 [data-testid="stMetric"] *{color:var(--text)!important;}
 
-/* Frosted glass cards (containers created with key="card_*") */
 [class*="st-key-card"]{
   background:linear-gradient(145deg,var(--glass2),var(--glass));
   backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);
@@ -177,7 +193,6 @@ header[data-testid="stHeader"]{background:transparent;}
   padding:1.4rem 1.6rem!important;margin-bottom:1.1rem;
 }
 
-/* Pill tabs */
 .stTabs [data-baseweb="tab-list"]{gap:8px;padding:6px;background:var(--glass);border:1px solid var(--border);
   border-radius:999px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow);width:fit-content;max-width:100%;overflow-x:auto;}
 .stTabs [data-baseweb="tab"]{background:transparent;border-radius:999px;padding:8px 18px;height:auto;}
@@ -186,11 +201,9 @@ header[data-testid="stHeader"]{background:transparent;}
 .stTabs [aria-selected="true"] p{color:#fff!important;}
 .stTabs [data-baseweb="tab-highlight"],.stTabs [data-baseweb="tab-border"]{display:none;}
 
-/* Expanders, inputs, alerts, uploader */
 [data-testid="stExpander"]{background:var(--glass);border:1px solid var(--border)!important;border-radius:16px!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 [data-testid="stExpander"] summary{font-weight:600;}
 
-/* Fixed Inputs for Mobile (Dark & Light Mode) */
 .stTextArea textarea, .stTextInput input, .stNumberInput input, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
     background: var(--input-bg) !important;
     color: var(--text) !important;
@@ -200,7 +213,6 @@ header[data-testid="stHeader"]{background:transparent;}
     caret-color: var(--text) !important;
 }
 
-/* Fix placeholder text visibility */
 .stTextArea textarea::placeholder, .stTextInput input::placeholder {
     color: var(--muted) !important;
     -webkit-text-fill-color: var(--muted) !important;
@@ -212,17 +224,12 @@ header[data-testid="stHeader"]{background:transparent;}
 .stButton>button,.stDownloadButton>button,[data-testid="stDownloadButton"]>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);white-space:nowrap;}
 .stButton>button:hover,.stDownloadButton>button:hover,[data-testid="stDownloadButton"]>button:hover,[data-testid="stFormSubmitButton"]>button:hover{filter:brightness(1.12);color:#fff;}
 
-/* Top bar: keep "Dark mode" on one line */
 .st-key-dark_mode *{white-space:nowrap;}
-
-/* Centered logo on the login card */
 .st-key-card_login [data-testid="stImage"]{display:flex;justify-content:center;}
 
-/* Forms and chat bubbles */
 [data-testid="stForm"]{border:none!important;padding:0!important;background:transparent!important;}
 [data-testid="stChatMessage"]{background:var(--glass);border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 
-/* Center the concept map */
 [data-testid="stGraphVizChart"]{display:flex;justify-content:center;}
 [data-testid="stGraphVizChart"] svg{margin:0 auto;max-width:100%;height:auto;}
 </style>
@@ -232,7 +239,6 @@ for k, v in THEMES[dark].items():
     css = css.replace(f"__{k}__", v)
 st.markdown(css, unsafe_allow_html=True)
 
-# ---------- THE HOOKLINE (Top Most Area) ----------
 st.markdown("""
 <div style="text-align: center; margin-top: 0.5rem; margin-bottom: 1.5rem;">
     <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2.5rem; font-weight: 800; 
@@ -243,23 +249,20 @@ st.markdown("""
     </h1>
 </div>
 """, unsafe_allow_html=True)
-# -----------------------------------------------
 
 def card(name):
     return st.container(border=True, key=f"card_{name}")
-
 
 def need_upload(tab_name):
     with card(f"empty_{tab_name}"):
         st.info("Upload a screenshot or PDF in the Capture tab first, or open a set from My Library.")
 
 
-# ---------- LOGIN PAGE ----------
 def start_user_session(user):
     st.session_state.auth_mode = "user"
     st.session_state.auth_user = user
     st.session_state.user_name = clean_name(user["name"])
-    st.session_state.name_asked = bool(st.session_state.user_name)  # known name = tutor doesn't ask
+    st.session_state.name_asked = bool(st.session_state.user_name)
     st.rerun()
 
 
@@ -329,40 +332,24 @@ if st.session_state.auth_mode is None:
     login_page()
     st.stop()
 
-# one-time message left over from the previous run (e.g. points earned just before a rerun)
 if st.session_state.flash:
     st.toast(st.session_state.flash)
     st.session_state.flash = ""
 
-
-# ---------- HELPERS ----------
 def get_context(res):
-    """Everything the tutor can use: summary, notes and extracted text (capped for safety)."""
     parts = [str(res.get("summary", "")), str(res.get("detailed_notes", "")), str(res.get("raw_text", ""))]
     return "\n\n".join(p for p in parts if p.strip())[:20000]
 
-
 def fix_latex(s):
-    """Repair formula symbols that JSON turned into control characters (tab, backspace...)."""
     s = str(s)
     fixes = {
-        "\text": r"\text",
-        "\times": r"\times",
-        "\theta": r"\theta",
-        "\tau": r"\tau",
-        "\frac": r"\frac",
-        "\beta": r"\beta",
-        "\bar": r"\bar",
-        "\rho": r"\rho",
-        "\rightarrow": r"\rightarrow",
-        "\alpha": r"\alpha",
-        "\approx": r"\approx",
-        "\vec": r"\vec",
+        "\text": r"\text", "\times": r"\times", "\theta": r"\theta", "\tau": r"\tau", "\frac": r"\frac",
+        "\beta": r"\beta", "\bar": r"\bar", "\rho": r"\rho", "\rightarrow": r"\rightarrow", "\alpha": r"\alpha",
+        "\approx": r"\approx", "\vec": r"\vec",
     }
     for bad, good in fixes.items():
         s = s.replace(bad, good)
     return s
-
 
 def pdf_page_count(data):
     try:
@@ -373,9 +360,7 @@ def pdf_page_count(data):
     except Exception:
         return None
 
-
 def pdf_slice(data, start, end):
-    """Return a new PDF containing pages start..end (1-based, inclusive)."""
     reader = PdfReader(io.BytesIO(data))
     if reader.is_encrypted:
         reader.decrypt("")
@@ -386,20 +371,17 @@ def pdf_slice(data, start, end):
     writer.write(out)
     return out.getvalue()
 
-
 def award(kind, immediate=False):
-    """Give points to a signed-in student. The database enforces the daily caps."""
     if st.session_state.auth_mode != "user":
         return
     pts = award_points(kind)
-    st.session_state.social = None  # progress changed, reload it next time
+    st.session_state.social = None
     if pts > 0:
         msg = f"+{pts} points 🔥"
         if immediate:
             st.toast(msg)
         else:
-            st.session_state.flash = msg  # shown after the next rerun
-
+            st.session_state.flash = msg
 
 def get_social(force=False):
     s = st.session_state.social
@@ -408,7 +390,6 @@ def get_social(force=False):
         s["t"] = time.time()
         st.session_state.social = s
     return s
-
 
 def friend_action(fn, *args):
     err = fn(*args)
@@ -419,9 +400,7 @@ def friend_action(fn, *args):
         st.session_state.confirm_remove = None
         st.rerun()
 
-
 def save_result(result, key, source=None):
-    """Store a fresh analysis, and save it (with its original upload) to the library when signed in."""
     if "error" in result:
         st.error(f"Analysis failed: {result['error']}")
         return
@@ -432,7 +411,7 @@ def save_result(result, key, source=None):
     st.session_state.analysis_result = clean
     st.session_state.file_key = key
     st.session_state.source = source
-    st.session_state.chat_history = []  # new material = fresh chat (name is kept)
+    st.session_state.chat_history = []
     st.session_state.revision_reveal = None
     st.session_state.mcq = None
     st.session_state.current_set_id = None
@@ -451,16 +430,13 @@ def save_result(result, key, source=None):
     else:
         st.session_state.save_note = "Guest mode: nothing is saved. Use the 📚 My Library tab to download this set."
 
-
 def show_done():
     st.success("Analysis complete. Open the other tabs.")
     note = st.session_state.save_note
     if note:
         (st.warning if note.startswith("⚠️") else st.caption)(note)
 
-
 def show_source(src):
-    """Show the original screenshot, or the details of the original PDF."""
     if not src:
         return
     raw = source_bytes(src)
@@ -478,12 +454,10 @@ def show_source(src):
         else:
             st.caption("This PDF was too large to store, so only its name and page range are kept.")
 
-
 def persist_chat():
     sid = st.session_state.current_set_id
     if st.session_state.auth_mode == "user" and sid:
         update_chat(sid, st.session_state.chat_history)
-
 
 def open_saved(set_id, title=""):
     data, err = load_set(set_id)
@@ -497,18 +471,14 @@ def open_saved(set_id, title=""):
     st.session_state.mcq = None
     st.session_state.current_set_id = set_id
     st.session_state.file_key = ("saved", set_id)
-    st.session_state.upload_gen += 1  # clears the uploader so an old file can't overwrite this set
+    st.session_state.upload_gen += 1
     st.session_state.save_note = ""
     st.session_state.flash = f"Opened “{title}”. Check the other tabs." if title else "Set opened. Check the other tabs."
     st.rerun()
 
-
 def render_revision(result, set_id=None, namespace="current"):
-    """Review one card at a time, revealing its answer before choosing a rating."""
     scope_key = f"speech_revision_{namespace}"
     with st.container(key=scope_key):
-        
-        # --- RESTORED NOTES & TXT DOWNLOAD ---
         st.write(f"**Subject:** {result.get('subject')} | **Topic:** {result.get('topic')}")
         notes = fix_latex(result.get("detailed_notes") or "No notes generated.")
         with st.expander("📖 Detailed study notes", expanded=True):
@@ -516,8 +486,6 @@ def render_revision(result, set_id=None, namespace="current"):
             st.markdown(notes)
         st.download_button("⬇️ Download notes as TXT", notes, file_name="study_notes.txt", key=f"dl_notes_{namespace}")
         st.write("---")
-        # -------------------------------------
-
         all_cards = list(flashcards(result))
         if not all_cards:
             st.info("No flashcards in this set yet.")
@@ -599,7 +567,6 @@ def build_mcq(flashcards):
     random.shuffle(questions)
     return questions
 
-
 def mcq_quiz(flashcards):
     if st.session_state.mcq is None:
         st.session_state.mcq = {
@@ -654,11 +621,9 @@ def mcq_quiz(flashcards):
             m["checked"] = False
             st.rerun()
 
-
 def build_dot(topic, concepts, links):
     esc = lambda s: str(s).replace('"', "'").replace("\\", "")
     wrap = lambda s, w=16: "\\n".join(textwrap.wrap(esc(s), w)) or " "
-
     lines = [
         "graph G {",
         '  graph [bgcolor="transparent", overlap=false, splines=true, ranksep=1.6, root="topic", pad=0.3];',
@@ -679,8 +644,6 @@ def build_dot(topic, concepts, links):
     lines.append("}")
     return "\n".join(lines)
 
-
-# ---------- PAGE ----------
 st.caption("Turn screenshots and PDFs into notes, flashcards, a concept map, an AI tutor and a focus hub.")
 
 tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz = st.tabs(
@@ -689,7 +652,6 @@ tab_home, tab_cap, tab_lib, tab_prog, tab_graph, tab_chat, tab_focus, tab_quiz =
 )
 
 # --- HOME ---
-# --- HOME ---
 with tab_home:
     with card("home"):
         st.header("Welcome to StudyStack")
@@ -697,7 +659,6 @@ with tab_home:
                  "makes flashcards, draws a concept map, grades your explanations, tutors you by text or voice, "
                  "and tracks your daily study focus time.")
         
-        # --- THE TUTORIAL BUTTON ---
         st.markdown("---")
         st.link_button(
             "🎥 Watch the Quick Tutorial", 
@@ -706,7 +667,6 @@ with tab_home:
         )
         st.caption("New here? Watch a quick silent walkthrough of how to use StudyStack.")
         st.markdown("---")
-        # ----------------------------
 
         if st.session_state.auth_mode == "guest":
             st.info("You're in guest mode, so nothing is saved on our side. Use **Sign in** (top right) to create an account, "
@@ -716,58 +676,63 @@ with tab_home:
 with tab_cap:
     with card("upload"):
         st.header("📸 Capture")
-        uploaded = st.file_uploader("Upload a screenshot (PNG, JPG) or a PDF", type=["png", "jpg", "jpeg", "pdf"],
-                                    key=f"uploader_{st.session_state.upload_gen}")
+        
+        # Multiple file upload enabled
+        uploaded_files = st.file_uploader("Upload screenshots or PDFs", 
+                                          type=["png", "jpg", "jpeg", "pdf"], 
+                                          accept_multiple_files=True,
+                                          key=f"uploader_{st.session_state.upload_gen}")
 
-        if uploaded is not None:
-            is_pdf = uploaded.name.lower().endswith(".pdf")
-
-            if not is_pdf:
-                # Screenshots are analyzed automatically, once per new file
-                st.image(uploaded, caption="Uploaded screenshot", width=400)
-                key = ("img", uploaded.name, uploaded.size)
-                if st.session_state.file_key != key:
-                    with st.spinner("Extracting knowledge and generating study materials..."):
-                        result = analyze_image(uploaded)
-                    save_result(result, key, source=make_image_source(uploaded))
-                if st.session_state.file_key == key:
-                    show_done()
-
-            else:
-                data = uploaded.getvalue()
-                if uploaded.size > MAX_PDF_MB * 1024 * 1024:
-                    st.error(f"This PDF is larger than {MAX_PDF_MB} MB. Try a smaller file or split it first.")
-                else:
-                    total = pdf_page_count(data)
-                    if not total:
-                        st.error("Couldn't read this PDF. It may be password-protected or damaged.")
+        if uploaded_files:
+            total_pages = 0
+            valid_files = []
+            
+            for f in uploaded_files:
+                if f.name.lower().endswith(".pdf"):
+                    data = f.getvalue()
+                    pages = pdf_page_count(data) or 1
+                    if f.size > MAX_PDF_MB * 1024 * 1024:
+                        st.error(f"❌ {f.name} is larger than {MAX_PDF_MB} MB. Skipping.")
                     else:
-                        st.write(f"📄 **{uploaded.name}** · {total} page{'s' if total != 1 else ''}")
-                        fid = f"{uploaded.name}_{uploaded.size}"
-                        c1, c2, _ = st.columns([1, 1, 3])
-                        start = int(c1.number_input("From page", min_value=1, max_value=total, value=1, step=1, key=f"from_{fid}"))
-                        end = int(c2.number_input("To page", min_value=1, max_value=total,
-                                                  value=min(total, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
-                        count = end - start + 1
-                        key = ("pdf", uploaded.name, uploaded.size, start, end)
+                        total_pages += pages
+                        valid_files.append((f, data, pages))
+                else:
+                    total_pages += 1
+                    valid_files.append((f, f.getvalue(), 1))
 
-                        if end < start:
-                            st.error("'To page' must be the same as or after 'From page'.")
-                        elif count > MAX_PDF_PAGES:
-                            st.warning(f"Please pick at most {MAX_PDF_PAGES} pages at a time (you picked {count}). "
-                                       "You can analyze the next chapter afterwards.")
+            if valid_files:
+                # Estimate time: ~2 seconds per page
+                est_seconds = total_pages * 2
+                est_min = est_seconds // 60
+                est_sec = est_seconds % 60
+                
+                time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
+                
+                st.info(f"📚 **{len(valid_files)} file(s) detected ({total_pages} pages).** Estimated analysis time: **{time_str}**. Grab a coffee while we work! ☕")
+                
+                if st.button("🚀 Start Analysis"):
+                    progress_bar = st.progress(0, text="Initializing AI...")
+                    file_count = len(valid_files)
+                    
+                    for idx, (f, data, pages) in enumerate(valid_files):
+                        progress_val = int((idx / file_count) * 100)
+                        progress_bar.progress(progress_val, text=f"Analyzing {f.name} ({idx+1}/{file_count})...")
+                        
+                        if f.name.lower().endswith(".pdf"):
+                            sliced = pdf_slice(data, 1, min(pages, MAX_PDF_PAGES))
+                            result = analyze_pdf(sliced)
+                            save_result(result, ("pdf", f.name, f.size, 1, min(pages, MAX_PDF_PAGES)), source=make_pdf_source(f.name, 1, min(pages, MAX_PDF_PAGES), sliced))
                         else:
-                            st.caption(f"{count} page{'s' if count != 1 else ''} selected.")
-                            if st.button("Analyze pages"):
-                                sliced = pdf_slice(data, start, end)
-                                with st.spinner("Reading your PDF and generating study materials..."):
-                                    result = analyze_pdf(sliced)
-                                save_result(result, key, source=make_pdf_source(uploaded.name, start, end, sliced))
-                            if st.session_state.file_key == key:
-                                show_done()
-
+                            result = analyze_image(f)
+                            save_result(result, ("img", f.name, f.size), source=make_image_source(f))
+                    
+                    progress_bar.progress(100, text="Analysis Complete!")
+                    st.success("🎉 All files have been analyzed and added to your library!")
+                    time.sleep(1)
+                    st.session_state.upload_gen += 1
+                    st.rerun()
+                    
         elif st.session_state.source:
-            # No new file chosen: show the original upload of the set that is open
             st.caption("📎 The original upload for the set you have open:")
             show_source(st.session_state.source)
 
@@ -791,49 +756,72 @@ with tab_lib:
             elif not lib["rows"]:
                 st.info("Nothing saved yet. Analyze a screenshot or PDF and it will appear here automatically.")
             else:
-                st.caption(f"{len(lib['rows'])} of {MAX_SETS} sets saved. Press Open on any set to load its notes, "
-                           "flashcards, concept map and original upload in the other tabs.")
-                st.caption("Your notes are automatically organized by the subject identified by AI.")
-                subject_groups = group_sets_by_subject(lib["rows"])
-                subject_tabs = st.tabs(list(subject_groups))
-                for subject_tab, subject_rows in zip(subject_tabs, subject_groups.values()):
-                    with subject_tab:
-                        for row in subject_rows:
-                            c1, c2, c3, c4 = st.columns([5, 2, 1.3, 1.3])
-                            c1.markdown(f"**{row['title']}**")
-                            c2.caption(str(row["created_at"])[:10])
-                            if c3.button("Open", key=f"open_{row['id']}"):
+                query = st.text_input("Search your library", key="library_search",
+                                      placeholder="Search titles, subjects or words inside your notes")
+                matched = search_sets(lib["rows"], query)
+                
+                st.caption(f"Showing {len(matched)} of {len(lib['rows'])} sets.")
+                
+                # --- NOTEBOOKLM GRID UI ---
+                cols = st.columns(3)
+                for i, row in enumerate(matched):
+                    with cols[i % 3]:
+                        with st.container(border=True):
+                            st.subheader(row['title'])
+                            st.caption(f"📅 {str(row['created_at'])[:10]}")
+                            st.caption(f"📚 {row.get('subject', 'General')}")
+                            
+                            c1, c2 = st.columns(2)
+                            if c1.button("Open", key=f"open_{row['id']}", use_container_width=True):
                                 open_saved(row["id"], row["title"])
-                            if c4.button("Delete", key=f"del_{row['id']}"):
+                            if c2.button("Delete", key=f"del_{row['id']}", use_container_width=True):
                                 st.session_state.confirm_delete = row["id"]
                                 st.rerun()
 
                             if st.session_state.confirm_delete == row["id"]:
-                                st.warning(f"Delete “{row['title']}”? This can't be undone.")
-                                y, n, _ = st.columns([1.3, 1, 4])
-                                if y.button("Yes, delete", key=f"yes_{row['id']}"):
-                                    err = delete_set(row["id"])
-                                    if err:
-                                        st.error(err)
-                                    else:
-                                        if st.session_state.current_set_id == row["id"]:
-                                            st.session_state.current_set_id = None
-                                        st.session_state.confirm_delete = None
-                                        st.session_state.lib_cache = None
-                                        st.rerun()
-                                if n.button("Cancel", key=f"no_{row['id']}"):
+                                st.warning(f"Delete “{row['title']}”?")
+                                y, n = st.columns(2)
+                                if y.button("Yes", key=f"yes_{row['id']}"):
+                                    delete_set(row["id"])
+                                    st.session_state.confirm_delete = None
+                                    st.session_state.lib_cache = None
+                                    st.rerun()
+                                if n.button("No", key=f"no_{row['id']}"):
                                     st.session_state.confirm_delete = None
                                     st.rerun()
         else:
             st.write("As a guest, nothing is stored on our side. Download your study set to keep it, and upload it here later to continue.")
 
-        if res is not None:
-            st.divider()
-            st.write(f"Currently open: **{res.get('topic') or 'Untitled'}**")
-            payload = json.dumps({"app": "studystack", "version": 1, "result": res,
-                                  "chat": st.session_state.chat_history}, ensure_ascii=False)
-            st.download_button("⬇️ Download this set", payload, file_name="studystack_set.json",
-                               mime="application/json", key="dl_set")
+        # --- JSON VAULT EXPORT/IMPORT ---
+        st.divider()
+        st.subheader("💾 Storage & Offline Vault")
+        
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            if res is not None:
+                json_data = export_lightweight_json(res)
+                safe_filename = f"{res.get('topic', 'studyset').replace(' ', '_')}_vault.json"
+                st.download_button(
+                    label="⬇️ Export Vault (JSON)",
+                    data=json_data,
+                    file_name=safe_filename,
+                    mime="application/json",
+                    help="Downloads a lightweight (<50KB) structured JSON file of your notes."
+                )
+            else:
+                st.caption("Open a set to export it.")
+                
+        with c2:
+            uploaded_vault = st.file_uploader("📂 Load Saved Vault", type=["json"], key="json_vault_loader")
+            if uploaded_vault:
+                loaded_data, err = import_lightweight_json(uploaded_vault)
+                if err:
+                    st.error(err)
+                else:
+                    st.session_state.analysis_result = loaded_data
+                    st.success(f"Loaded: {loaded_data.get('topic')}")
+                    st.rerun()
 
         if st.session_state.auth_mode == "guest":
             st.divider()
@@ -992,7 +980,7 @@ with tab_graph:
                 dot = build_dot(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 try:
                     st.graphviz_chart(dot, engine="twopi", use_container_width=True)
-                except TypeError:  # older Streamlit without the engine argument
+                except TypeError:
                     st.graphviz_chart(dot, use_container_width=True)
                 st.caption("Solid lines connect the topic to its concepts. Dashed lines show how concepts relate.")
                 map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
@@ -1019,7 +1007,6 @@ with tab_chat:
         with card("chat"):
             st.header("AI Tutor & Voice Hub")
             st.caption("StudyStack is an AI and can make mistakes. Double-check important facts, especially before exams.")
-            # Step 1: ask the student's name (skipped for signed-in users, who already have one)
             if not st.session_state.name_asked:
                 with st.chat_message("assistant"):
                     st.markdown("Hi! I'm your StudyStack tutor 👋 What should I call you?")
@@ -1040,8 +1027,6 @@ with tab_chat:
                     st.session_state.user_name = ""
                     st.session_state.name_asked = True
                     st.rerun()
-
-            # Step 2: voice + text chat
             else:
                 st.write("Ask by text, or record your voice to ask a question or explain a concept out loud.")
 
@@ -1062,7 +1047,7 @@ with tab_chat:
                                 st.session_state.chat_history.append({"role": "assistant", "content": reply})
                                 persist_chat()
                                 award("tutor")
-                                st.session_state.voice_gen += 1  # empties the recorder
+                                st.session_state.voice_gen += 1
                                 st.rerun()
 
                 st.markdown("---")
@@ -1083,7 +1068,7 @@ with tab_chat:
                         with st.spinner("Thinking..."):
                             reply = chat_with_notes(q, context, st.session_state.chat_history, name)
                         if reply.startswith("⚠️"):
-                            st.warning(reply)  # errors are shown but not saved in the chat
+                            st.warning(reply)
                         else:
                             st.session_state.chat_history.append({"role": "user", "content": q})
                             st.session_state.chat_history.append({"role": "assistant", "content": reply})
@@ -1102,14 +1087,13 @@ with tab_chat:
                 if b2.button("Change name"):
                     st.session_state.name_asked = False
                     st.rerun()
+
 # --- FOCUS HUB ---
 with tab_focus:
     with card("focus_hub_tab"):
         st.header("⏱️ Focus & Pomodoro Hub")
-        
-        # Initialize states if they don't exist
         if "focus_timer_state" not in st.session_state:
-            st.session_state.focus_timer_state = "idle" # "idle", "running", "paused"
+            st.session_state.focus_timer_state = "idle"
         if "focus_timer_end" not in st.session_state:
             st.session_state.focus_timer_end = 0
         if "focus_timer_remaining" not in st.session_state:
@@ -1119,27 +1103,21 @@ with tab_focus:
 
         if st.session_state.focus_timer_state == "idle":
             st.write("Stay locked in. Choose your study mode, track your focus time, and build your daily study streak.")
-            
             col1, col2 = st.columns(2)
             with col1:
                 session_type = st.selectbox("Select Study Mode", ["Deep Work Pomodoro (25m)", "Shallow Work (30m)", "Revision (10m)"],
                                             key="focus_hub_study_mode")
             with col2:
                 st.metric("Total Focus Time Today", f"{st.session_state.study_minutes} mins", delta="+15 mins vs yesterday")
-
             st.markdown("---")
-            
             selected_minutes = 25 if session_type == "Deep Work Pomodoro (25m)" else (30 if session_type == "Shallow Work (30m)" else 10)
-            
             st.write(f"Ready to focus for **{selected_minutes} minutes**?")
             st.caption("⚠️ *Warning: You must stay on this tab for the entire duration. If you switch tabs or refresh, the session will reset.*")
-            
             if st.button("🚀 Start Focus Session"):
                 st.session_state.focus_timer_state = "running"
                 st.session_state.focus_timer_end = time.time() + (selected_minutes * 60)
                 st.session_state.focus_timer_mins = selected_minutes
                 st.rerun()
-                
         elif st.session_state.focus_timer_state == "running":
             remaining = int(st.session_state.focus_timer_end - time.time())
             if remaining <= 0:
@@ -1152,7 +1130,6 @@ with tab_focus:
                 st.rerun()
             else:
                 mins, secs = divmod(remaining, 60)
-                
                 timer_html = f"""
                 <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
                     <div id="timer-display" style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
@@ -1173,9 +1150,7 @@ with tab_focus:
                 </script>
                 """
                 components.html(timer_html, height=220)
-                
                 st.info("💡 You can safely switch tabs. The timer will keep running in the background.")
-                
                 c1, c2 = st.columns(2)
                 if c1.button("⏸️ Pause Timer"):
                     st.session_state.focus_timer_state = "paused"
@@ -1184,20 +1159,16 @@ with tab_focus:
                 if c2.button("🛑 Stop & Reset"):
                     st.session_state.focus_timer_state = "idle"
                     st.rerun()
-                    
         elif st.session_state.focus_timer_state == "paused":
             remaining = st.session_state.focus_timer_remaining
             mins, secs = divmod(remaining, 60)
-            
             st.markdown(f"""
             <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 40px; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif; color: white;">
                 <div style="font-size: 5rem; font-weight: 800; margin-bottom: 10px;">{mins:02d}:{secs:02d}</div>
                 <p style="color: #aab4d4;">Paused</p>
             </div>
             """, unsafe_allow_html=True)
-            
             st.info("⏸️ Timer Paused. You can safely visit other tabs.")
-            
             c1, c2 = st.columns(2)
             if c1.button("▶️ Resume Timer"):
                 st.session_state.focus_timer_end = time.time() + remaining
@@ -1210,11 +1181,9 @@ with tab_focus:
         st.markdown("---")
         st.subheader("📊 Study Analytics")
         st.write(f"**Completed Sessions Today:** {st.session_state.sessions_completed}")
-
         progress_val = min(st.session_state.study_minutes / 120.0, 1.0)
         st.write("Daily Goal Progress (Target: 120 mins):")
         st.progress(progress_val)
-
         if st.session_state.study_minutes >= 120:
             st.success("🎉 Daily study goal reached! Amazing work.")
         else:
@@ -1236,7 +1205,6 @@ with tab_quiz:
                 st.write(f"Explain **{topic}** in your own words and get graded.")
                 answer = st.text_area("Your explanation", key="feynman_answer")
                 
-                # --- COPY BUTTON FEATURE ---
                 components.html(
                     """
                     <style>
@@ -1264,7 +1232,7 @@ with tab_quiz:
                     function copyText() {
                         const textareas = window.parent.document.querySelectorAll('textarea');
                         if (textareas.length > 0) {
-                            const target = textareas[textareas.length - 1]; // grabs the latest textarea
+                            const target = textareas[textareas.length - 1];
                             if (target && target.value) {
                                 navigator.clipboard.writeText(target.value).then(() => {
                                     alert("✅ Copied to clipboard!");
@@ -1278,7 +1246,6 @@ with tab_quiz:
                     """,
                     height=45
                 )
-                # ---------------------------
 
                 prompt_text = f"Explain {topic} in your own words."
                 if answer.strip():
