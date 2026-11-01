@@ -767,11 +767,13 @@ def mcq_quiz(flashcards):
                 award("quiz", immediate=True)
         if st.button("🔄 Restart quiz", key="mcq_restart"):
             st.session_state.mcq = None
-          st.rerun()
+            st.rerun()
         return
-          q = qs[m["i"]]
+
+    q = qs[m["i"]]
     st.progress(m["i"] / len(qs))
     st.caption(f"Question {m['i'] + 1} of {len(qs)} | Score: {m['score']}")
+  
     st.subheader(q["q"])
     pick = st.radio("Choose one:", q["options"], index=None, key=f"mcq_pick_{m['run']}_{m['i']}", disabled=m["checked"])
     read_aloud(quiz_reading_text(q, m["checked"], m["correct"]),
