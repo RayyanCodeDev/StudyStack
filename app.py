@@ -1501,7 +1501,7 @@ with tab_chat:
 
                 with history_box:
                 # --- SCROLLABLE CHAT HISTORY ---
-                with st.container(height=450): # You can change 450 to whatever height you want
+                with st.container(height=450):
                     for m in st.session_state.chat_history:
                         with st.chat_message(m["role"]):
                             st.markdown(m["content"])
