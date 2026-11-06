@@ -1476,6 +1476,7 @@ with tab_chat:
                             st.session_state.voice_gen += 1
                             st.rerun()
 
+                history_box = st.container()
                 lang = st.selectbox("Tutor language", ["Auto", "English", "Roman Urdu", "Urdu"], key="tutor_lang")
                 think_first = st.toggle("🧠 Think-First mode: try it yourself before the tutor explains",
                                         value=True, key="think_first")
@@ -1491,16 +1492,17 @@ with tab_chat:
                             reply = chat_with_notes(q, context, st.session_state.chat_history, name, lang)
                         st.session_state.chat_history.append({"role": "user", "content": q})
                         st.session_state.chat_history.append({"role": "assistant", "content": reply})
-                        with st.chat_message("user"):
-                            st.markdown(q)
-                        with st.chat_message("assistant"):
-                            st.markdown(reply)
                         try:
                             persist_chat()
                             if len(q.strip()) >= 5:
                                 award("tutor")
                         except Exception as e:
                             st.warning(f"Reply shown, but saving failed: {e}")
+
+                with history_box:
+                    for m in st.session_state.chat_history:
+                        with st.chat_message(m["role"]):
+                            st.markdown(m["content"])
 # --- FOCUS HUB ---
 with tab_focus:
     with card("focus_hub_tab"):
