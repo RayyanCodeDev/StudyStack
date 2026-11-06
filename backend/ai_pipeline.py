@@ -119,7 +119,9 @@ def analyze_pdf(pdf_bytes):
 
 def _ask(prompt):
     try:
-        return get_client().models.generate_content(model=MODEL, contents=prompt).text
+        response = get_client().models.generate_content(model=MODEL, contents=prompt)
+        text = (response.text or "").strip()
+        return text or "⚠️ The AI sent back an empty answer. Please try again."
     except Exception as e:
         return friendly_error(e)
 
