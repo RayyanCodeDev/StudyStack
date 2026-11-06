@@ -12,7 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
-from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes
+from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes, think_first_reply
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
@@ -255,8 +255,8 @@ DEFAULTS = {
     "source": None,
     "chat_history": [],
     "mcq": None,
-    "study_minutes": 25,
-    "sessions_completed": 2,
+    "study_minutes": 0,
+    "sessions_completed": 0,
     "focus_timer_state": "idle",
     "focus_timer_end": 0,
     "focus_timer_remaining": 0,
@@ -276,6 +276,9 @@ DEFAULTS = {
     "friend_msg": None,
     "confirm_remove": None,
     "revision_reveal": None,
+      "quiz_log": {},
+    "tf": None,
+    "tf_log": [],
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -727,6 +730,157 @@ def render_revision(result, set_id=None, namespace="current"):
                 st.session_state.flash = f"Review recorded. Next review in {interval_label(updated['review_progress'][key])}."
                 st.rerun()
 
+# ---------- Metacognition Engine helpers ----------
+CONF_LEVELS = ["Sure", "Unsure", "Guess"]
+MASTERY_COLORS = {"green": "#2ecc71", "amber": "#f5a623", "red": "#e74c3c", "grey": "#8a93b2"}
+MASTERY_LABELS = {"green": "strong", "amber": "shaky", "red": "weak", "grey": "not tested yet"}
+HINT_LABELS = {1: "💬 Nudge", 2: "💡 Clue", 3: "🪜 Worked step", 4: "✅ Full answer"}
+
+def tkey(topic):
+    return str(topic or "").strip()
+
+def concept_for_text(text, concepts):
+    """Match a flashcard to the key concept whose words appear most in it."""
+    t = str(text).lower()
+    best, best_score = None, 0.0
+    for c in concepts or []:
+        words = [w for w in re.findall(r"\w+", str(c).lower()) if len(w) > 3]
+        if not words:
+            continue
+        score = sum(1 for w in words if w in t) / len(words)
+        if score > best_score:
+            best, best_score = str(c).strip(), score
+    return best if best_score >= 0.5 else None
+
+def mastery_status(topic, concept):
+    """green / amber / red / grey for one concept, from this session's quiz log."""
+    concept = str(concept).strip()
+    entries = [e for e in st.session_state.quiz_log.get(tkey(topic), []) if e.get("concept") == concept]
+    if not entries:
+        return "grey"
+    acc = sum(1 for e in entries if e["ok"]) / len(entries)
+    level = 2 if acc >= 0.8 else (1 if acc >= 0.5 else 0)
+    if any(e["conf"] == "Sure" and not e["ok"] for e in entries):
+        level = max(0, level - 1)   # a confident mistake pulls the colour down
+    return ["red", "amber", "green"][level]
+
+def confident_mistakes(topic):
+    """Questions whose latest answer was 'Sure' but wrong."""
+    last = {}
+    for e in st.session_state.quiz_log.get(tkey(topic), []):
+        last[e["q"]] = e
+    return {q for q, e in last.items() if e["conf"] == "Sure" and not e["ok"]}
+
+def calibration_rows(log):
+    rows = []
+    for level in CONF_LEVELS:
+        items = [e for e in log if e["conf"] == level]
+        if items:
+            right = sum(1 for e in items if e["ok"])
+            rows.append({"You said": level, "Questions": len(items), "Right": right,
+                         "Accuracy": f"{round(100 * right / len(items))}%"})
+    return rows
+
+def show_calibration(log):
+    if not log:
+        return
+    st.subheader("🎯 Know What You Know")
+    sure = [e for e in log if e["conf"] == "Sure"]
+    if sure:
+        right = sum(1 for e in sure if e["ok"])
+        pct = round(100 * right / len(sure))
+        st.markdown(f"When you said **Sure**, you were right **{pct}%** of the time ({right} of {len(sure)}).")
+        if pct >= 85:
+            st.success("Your confidence matches your knowledge. Well calibrated!")
+        elif pct >= 60:
+            st.warning("Some of your “Sure” answers were wrong. Double-check the ones you feel certain about.")
+        else:
+            st.error("You were often confident and wrong. Those topics need a second look.")
+    else:
+        st.caption("You never picked “Sure” this round.")
+    st.table(pd.DataFrame(calibration_rows(log)))
+    bad = [e for e in sure if not e["ok"]]
+    if bad:
+        st.markdown("**Confident mistakes** (they come back first next time):")
+        for e in bad:
+            st.markdown(f"- {e['q']} → correct answer: **{e['answer']}**")
+
+def reliance_meter():
+    log = st.session_state.tf_log
+    if not log:
+        return
+    n = len(log)
+    tried = sum(1 for e in log if e["tried"])
+    per_q = [min(1.0 if e["tried"] else 0.5, (4 - e["level"]) / 3) for e in log]
+    independence = round(100 * sum(per_q) / n)
+    avg_level = sum(e["level"] for e in log) / n
+    st.markdown("**🧭 AI Reliance Meter**")
+    st.progress(independence / 100, text=f"Independence: {independence}%")
+    st.caption(f"You tried first on {tried} of {n} question(s). Average help level: {avg_level:.1f} of 4 "
+               "(1 = nudge, 4 = full answer).")
+
+def think_first_ui(context, name, lang):
+    tf = st.session_state.tf
+    if tf is None:
+        with st.form("tf_q", clear_on_submit=True):
+            q = st.text_input("What do you want to understand or solve?", placeholder="Type your question")
+            go = st.form_submit_button("Start")
+        if go and q.strip():
+            st.session_state.tf = {"q": q.strip(), "attempt": None, "level": 0, "tried": False}
+            st.rerun()
+        reliance_meter()
+        return
+
+    st.markdown(f"**Your question:** {tf['q']}")
+
+    if tf["attempt"] is None:
+        st.info("🧠 Your turn first! Write what you think, even if you're unsure. The tutor builds on your attempt.")
+        with st.form("tf_attempt", clear_on_submit=True):
+            a = st.text_area("My attempt", height=100)
+            c1, c2, _ = st.columns([1.3, 1.5, 3])
+            sub = c1.form_submit_button("Submit attempt")
+            skip = c2.form_submit_button("I don't know yet")
+        if sub and not a.strip():
+            st.warning("Write something first, or press “I don't know yet”.")
+        elif sub or skip:
+            tried = bool(sub)
+            attempt = a.strip() if tried else "(The student has no idea yet.)"
+            with st.spinner("Thinking..."):
+                reply = think_first_reply(tf["q"], attempt, 1, context, st.session_state.chat_history, name, lang)
+            tf["attempt"], tf["level"], tf["tried"] = attempt, 1, tried
+            st.session_state.tf_log.append({"tried": tried, "level": 1})
+            shown = attempt if tried else "*(no idea yet)*"
+            st.session_state.chat_history += [
+                {"role": "user", "content": f"**Question:** {tf['q']}\n\n**My attempt:** {shown}"},
+                {"role": "assistant", "content": f"{HINT_LABELS[1]}\n\n{reply}"},
+            ]
+            persist_chat()
+            award("tutor")
+            st.rerun()
+        reliance_meter()
+        return
+
+    level = tf["level"]
+    n_log = len(st.session_state.tf_log)
+    st.caption(f"Help so far: {HINT_LABELS[level]} (level {level} of 4)")
+    c1, c2, _ = st.columns([2.4, 1.6, 2])
+    if level < 4 and c1.button(f"Need more help → {HINT_LABELS[level + 1]}", key=f"tf_more_{n_log}_{level}"):
+        new = level + 1
+        with st.spinner("Thinking..."):
+            reply = think_first_reply(tf["q"], tf["attempt"], new, context, st.session_state.chat_history, name, lang)
+        tf["level"] = new
+        st.session_state.tf_log[-1]["level"] = new
+        st.session_state.chat_history += [
+            {"role": "user", "content": "*(asked for more help)*"},
+            {"role": "assistant", "content": f"{HINT_LABELS[new]}\n\n{reply}"},
+        ]
+        persist_chat()
+        st.rerun()
+    if c2.button("➕ New question", key=f"tf_new_{n_log}_{level}"):
+        st.session_state.tf = None
+        st.rerun()
+    reliance_meter()
+
 def build_mcq(flashcards):
     cards = [c for c in flashcards if str(c.get("front") or "").strip() and str(c.get("back") or "").strip()]
     backs = sorted({str(c["back"]).strip() for c in cards})
@@ -743,16 +897,24 @@ def build_mcq(flashcards):
     random.shuffle(questions)
     return questions
 
-def mcq_quiz(flashcards):
+def mcq_quiz(flashcards, concepts, topic):
+    topic = tkey(topic)
     if st.session_state.mcq is None:
+        qs = build_mcq(flashcards)
+        for item in qs:
+            item["concept"] = concept_for_text(item["q"] + " " + item["answer"], concepts)
+        redo = confident_mistakes(topic)
+        qs.sort(key=lambda item: 0 if item["q"] in redo else 1)   # confident mistakes come first
         st.session_state.mcq = {
-            "qs": build_mcq(flashcards),
+            "qs": qs,
             "i": 0,
             "score": 0,
             "checked": False,
             "correct": False,
             "awarded": False,
             "run": random.randint(0, 10**9),
+            "log": [],
+            "redo": sum(1 for item in qs if item["q"] in redo),
         }
     m = st.session_state.mcq
     qs = m["qs"]
@@ -761,6 +923,7 @@ def mcq_quiz(flashcards):
         return
     if m["i"] >= len(qs):
         st.success(f"🎉 Finished! Your score: {m['score']}/{len(qs)}")
+        show_calibration(m["log"])
         if not m["awarded"]:
             m["awarded"] = True
             if len(qs) >= 3:
@@ -773,26 +936,38 @@ def mcq_quiz(flashcards):
     q = qs[m["i"]]
     st.progress(m["i"] / len(qs))
     st.caption(f"Question {m['i'] + 1} of {len(qs)} | Score: {m['score']}")
-  
+    if m["i"] < m["redo"]:
+        st.caption("🔁 You were Sure but wrong on this one before, so it's back early.")
+
     st.subheader(q["q"])
     pick = st.radio("Choose one:", q["options"], index=None, key=f"mcq_pick_{m['run']}_{m['i']}", disabled=m["checked"])
+    conf = st.radio("How sure are you?", CONF_LEVELS, index=None, horizontal=True,
+                    key=f"mcq_conf_{m['run']}_{m['i']}", disabled=m["checked"])
     read_aloud(quiz_reading_text(q, m["checked"], m["correct"]),
                key=f"tts_mcq_{m['run']}_{m['i']}", scope="card_quiz")
     if not m["checked"]:
         if st.button("Check answer", key="mcq_check"):
             if pick is None:
                 st.warning("Pick an answer first.")
+            elif conf is None:
+                st.warning("Say how sure you are first: Sure, Unsure or Guess.")
             else:
                 m["checked"] = True
                 m["correct"] = (pick == q["answer"])
                 if m["correct"]:
                     m["score"] += 1
+                entry = {"q": q["q"], "answer": q["answer"], "concept": q.get("concept"),
+                         "conf": conf, "ok": m["correct"]}
+                m["log"].append(entry)
+                st.session_state.quiz_log.setdefault(topic, []).append(entry)
                 st.rerun()
     else:
         if m["correct"]:
             st.success("✅ Correct!")
         else:
             st.error(f"❌ Not quite. The correct answer is: {q['answer']}")
+            if conf == "Sure":
+                st.warning("⚠️ That was a confident mistake. It will come back sooner.")
         label = "Next question ➡️" if m["i"] + 1 < len(qs) else "See results 🏁"
         if st.button(label, key="mcq_next"):
             m["i"] += 1
@@ -1004,7 +1179,7 @@ with tab_lib:
 with tab_explore:
     with card("explore_lib"):
         st.header("🌍 Explore Multi-Sector Library")
-        st.caption("Browse pre-indexed curriculum resources spanning Nursery/KG Juniors, Matriculation, Intermediate Boards, O/A Levels, MBBS, FCPS, Undergraduate, Master's, PhD, Professional Certifications, and Law.")
+        st.caption("Browse sample study sets spanning Nursery/KG Juniors, Matriculation, Intermediate Boards, O/A Levels, MBBS, FCPS, Undergraduate, Master's, PhD, Professional Certifications, and Law.")
         
         sector_filter = st.selectbox(
             "Filter by Educational Sector", 
@@ -1046,7 +1221,7 @@ with tab_explore:
             with cols[idx % 2]:
                 with st.container(border=True):
                     st.markdown(f"### 📘 {vault['title']}")
-                    st.caption(f"🏫 **Sector:** {vault['sector']} · 🏷️ **Subject:** {vault['subject']} · 📄 **{vault['sources_count']} Sources**")
+                    st.caption(f"🏫 **Sector:** {vault['sector']} · 🏷️ **Subject:** {vault['subject']} · 🧪 **Sample set**")
                     st.write(vault["summary"])
                     if st.button(f"🚀 Load into StudyStack Workspace", key=f"load_global_vault_{idx}"):
                         st.session_state.analysis_result = vault
@@ -1160,11 +1335,13 @@ with tab_graph:
                 graph_bg = "#0e1117" if dark else "#ffffff"
                 graph_font = "#ffffff" if dark else "#000000"
                 net = Network(height="500px", width="100%", bgcolor=graph_bg, font_color=graph_font)
-                net.add_node(topic_name, label=topic_name, color="#FF6B6B", size=35, title=topic_name)
+                net.add_node(topic_name, label=topic_name, color="#7c5cff", size=35, title=topic_name)
                 
                 for i, concept in enumerate(concepts):
                     concept_id = f"c_{i}"
-                    net.add_node(concept_id, label=concept, color="#4ECDC4", size=25, title=concept)
+                    status = mastery_status(topic_name, concept)
+                    net.add_node(concept_id, label=concept, color=MASTERY_COLORS[status], size=25,
+                                 title=f"{concept}: {MASTERY_LABELS[status]}")
                     net.add_edge(topic_name, concept_id, color="#aab4d4")
 
                 net.set_options("""
@@ -1192,6 +1369,8 @@ with tab_graph:
                 except Exception as e:
                     st.error(f"Could not generate graph: {e}")
                   
+                st.caption("🟢 Strong · 🟠 Shaky · 🔴 Weak or a confident mistake · ⚪ Not tested yet. "
+                           "Colours come from your quiz answers and how sure you were.")
                 map_words = concept_map_text(res.get("topic", "Topic"), concepts, res.get("relationships", []))
                 read_aloud(map_words, key="tts_mindmap", scope="card_graph")
                 with st.expander("Read the concept map in words"):
@@ -1250,23 +1429,25 @@ with tab_chat:
                             st.session_state.voice_gen += 1
                             st.rerun()
 
-                for m in st.session_state.chat_history:
-                    with st.chat_message(m["role"]):
-                        st.markdown(m["content"])
+                lang = st.selectbox("Tutor language", ["Auto", "English", "Roman Urdu", "Urdu"], key="tutor_lang")
+                think_first = st.toggle("🧠 Think-First mode: try it yourself before the tutor explains",
+                                        value=True, key="think_first")
+                if think_first:
+                    think_first_ui(context, name, lang)
+                else:
+                    with st.form("chat_form", clear_on_submit=True):
+                        q = st.text_input("Ask about the material", placeholder="Type your question")
+                        sent = st.form_submit_button("Ask")
 
-                with st.form("chat_form", clear_on_submit=True):
-                    q = st.text_input("Ask about the material", placeholder="Type your question")
-                    sent = st.form_submit_button("Ask")
-
-                if sent and q.strip():
-                    with st.spinner("Thinking..."):
-                        reply = chat_with_notes(q, context, st.session_state.chat_history, name)
-                    st.session_state.chat_history.append({"role": "user", "content": q})
-                    st.session_state.chat_history.append({"role": "assistant", "content": reply})
-                    persist_chat()
-                    if len(q.strip()) >= 5:
-                        award("tutor")
-                    st.rerun()
+                    if sent and q.strip():
+                        with st.spinner("Thinking..."):
+                            reply = chat_with_notes(q, context, st.session_state.chat_history, name, lang)
+                        st.session_state.chat_history.append({"role": "user", "content": q})
+                        st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                        persist_chat()
+                        if len(q.strip()) >= 5:
+                            award("tutor")
+                        st.rerun()
 
 # --- FOCUS HUB ---
 with tab_focus:
@@ -1317,7 +1498,7 @@ with tab_quiz:
             st.header("🧠 Metacognition Quiz")
             mode = st.radio("Quiz mode", ["Multiple choice", "Feynman (explain it)"], horizontal=True)
             if mode == "Multiple choice":
-                mcq_quiz(res.get("flashcards", []))
+                mcq_quiz(res.get("flashcards", []), res.get("key_concepts", []), topic)
             else:
                 st.write(f"Explain **{topic}** in your own words.")
                 answer = st.text_area("Your explanation", key="feynman_answer")
