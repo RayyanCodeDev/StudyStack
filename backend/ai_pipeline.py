@@ -236,3 +236,45 @@ Other rules:
 - Do not greet the student.
 - {_lang_rule(language)}
 - Finish with one last line on its own: "Source: From your notes", "Source: General knowledge" or "Source: Notes + general knowledge", whichever is true.""")
+def make_distractors(cards):
+    """cards: list of {"front", "back"}. Returns {card_index: [3 wrong answers]}; {} on any failure."""
+    items = [{"i": i, "question": str(c["front"])[:300], "correct": str(c["back"])[:300]}
+             for i, c in enumerate(cards)]
+    prompt = f"""You write multiple-choice wrong answers for a student quiz.
+For each item below, write exactly 3 WRONG answers for the question.
+
+Rules:
+- Each wrong answer must have the same type, grammatical form and similar length as the correct answer.
+  If the correct answer is a full sentence, the wrong answers are full sentences too.
+  If it is a single name or number, the wrong answers are single names or numbers.
+- They must be plausible and about the same topic, so a student who does not know the answer cannot guess from the wording.
+- They must be clearly wrong to an expert. Never partly correct. Never "all of the above" or "none of the above".
+- Do not repeat the correct answer or each other.
+
+Return ONLY valid JSON: [{{"i": 0, "wrong": ["...", "...", "..."]}}, ...] with one entry per item.
+
+Items:
+{json.dumps(items, ensure_ascii=False)}
+"""
+    try:
+        response = get_client().models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+        text = response.text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        data = json.loads(text)
+        out = {}
+        for row in data:
+            if isinstance(row, dict) and isinstance(row.get("i"), int) and isinstance(row.get("wrong"), list):
+                wrong = [str(w).strip() for w in row["wrong"] if str(w).strip()]
+                if wrong:
+                    out[row["i"]] = wrong[:3]
+        return out
+    except Exception:
+        return {}
