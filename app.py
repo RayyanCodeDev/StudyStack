@@ -1491,13 +1491,16 @@ with tab_chat:
                             reply = chat_with_notes(q, context, st.session_state.chat_history, name, lang)
                         st.session_state.chat_history.append({"role": "user", "content": q})
                         st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                        with st.chat_message("user"):
+                            st.markdown(q)
+                        with st.chat_message("assistant"):
+                            st.markdown(reply)
                         try:
                             persist_chat()
                             if len(q.strip()) >= 5:
                                 award("tutor")
                         except Exception as e:
-                            st.session_state.flash = f"Reply shown, but saving failed: {e}"
-                        st.rerun()
+                            st.warning(f"Reply shown, but saving failed: {e}")
 # --- FOCUS HUB ---
 with tab_focus:
     with card("focus_hub_tab"):
