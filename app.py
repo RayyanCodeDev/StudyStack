@@ -1500,9 +1500,12 @@ with tab_chat:
                             st.warning(f"Reply shown, but saving failed: {e}")
 
                 with history_box:
+                # --- SCROLLABLE CHAT HISTORY ---
+                with st.container(height=450): # You can change 450 to whatever height you want
                     for m in st.session_state.chat_history:
                         with st.chat_message(m["role"]):
                             st.markdown(m["content"])
+                # -------------------------------
 # --- FOCUS HUB ---
 with tab_focus:
     with card("focus_hub_tab"):
