@@ -198,8 +198,10 @@ def _lang_rule(language):
         return "Reply in Urdu script. Keep technical terms in English."
     if language == "English":
         return "Reply in English."
-    return "Reply in the language the student wrote in. If they write Roman Urdu, reply in Roman Urdu."
-
+        return ("Reply in the language of the student's own latest messages (their question and attempt). "
+            "Ignore the language of earlier tutor replies. If the student wrote in English, or only wrote something "
+            "like 'idk', reply in English. Use Roman Urdu only if the student themselves wrote Roman Urdu, "
+            "and Urdu script only if they wrote Urdu script.")
 
 HINT_RULES = {
     1: "LEVEL 1, NUDGE: React to the student's attempt. Say what is right, point to what to rethink, and ask ONE guiding question. Do NOT give the answer.",
