@@ -12,7 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
-from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes, think_first_reply
+from backend.ai_pipeline import analyze_image, analyze_pdf, grade_answer, chat_with_notes, think_first_reply, make_distractors
 from backend.voice import MAX_AUDIO_MB, evaluate_voice
 from backend.auth import EMAIL_RE, auth_configured, sign_in, sign_up, sign_out
 from backend.library import (MAX_SETS, clean_chat, clean_result, delete_set, list_sets,
@@ -881,15 +881,38 @@ def think_first_ui(context, name, lang):
         st.rerun()
     reliance_meter()
 
+def get_distractors(cards):
+    """One AI call per set: wrong answers in the same form as the right one. Cached for the session."""
+    cache = st.session_state.setdefault("distractor_cache", {})
+    key = str(hash(tuple((str(c["front"]), str(c["back"])) for c in cards)))
+    if key in cache:
+        return cache[key]
+    with st.spinner("Writing fair answer choices..."):
+        found = make_distractors(cards)
+    if found:
+        cache[key] = found
+    return found
+
 def build_mcq(flashcards):
     cards = [c for c in flashcards if str(c.get("front") or "").strip() and str(c.get("back") or "").strip()]
     backs = sorted({str(c["back"]).strip() for c in cards})
+    distractors = get_distractors(cards) if cards else {}
     questions = []
-    for c in cards:
+    for idx, c in enumerate(cards):
         correct = str(c["back"]).strip()
-        others = [b for b in backs if b != correct]
-        random.shuffle(others)
-        options = [correct] + others[:3]
+        wrong = []
+        for w in distractors.get(idx, []):
+            w = str(w).strip()
+            if w and w.lower() != correct.lower() and w not in wrong:
+                wrong.append(w)
+        if len(wrong) < 3:
+            # fallback: other cards' answers, preferring ones of similar length
+            others = [b for b in backs if b != correct and b not in wrong]
+            others.sort(key=lambda b: abs(len(b) - len(correct)))
+            pool = others[:6]
+            random.shuffle(pool)
+            wrong += pool[: 3 - len(wrong)]
+        options = [correct] + wrong[:3]
         if len(options) < 2:
             continue
         random.shuffle(options)
