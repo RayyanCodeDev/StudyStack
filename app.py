@@ -1489,13 +1489,14 @@ with tab_chat:
                     if sent and q.strip():
                         with st.spinner("Thinking..."):
                             reply = chat_with_notes(q, context, st.session_state.chat_history, name, lang)
+                        st.error(f"DEBUG reply = {reply!r}")
+                        st.stop()
                         st.session_state.chat_history.append({"role": "user", "content": q})
                         st.session_state.chat_history.append({"role": "assistant", "content": reply})
                         persist_chat()
                         if len(q.strip()) >= 5:
                             award("tutor")
                         st.rerun()
-
 # --- FOCUS HUB ---
 with tab_focus:
     with card("focus_hub_tab"):
