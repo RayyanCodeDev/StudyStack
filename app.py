@@ -1365,6 +1365,30 @@ with tab_graph:
                     net.save_graph(path)
                     with open(path, 'r', encoding='utf-8') as f:
                         html_data = f.read()
+                    fit_js = """
+<script>
+(function () {
+  function fitIt() {
+    try {
+      network.setSize("100%", "500px");
+      network.redraw();
+      network.fit({animation: false});
+    } catch (e) {}
+  }
+  var tries = 0;
+  var timer = setInterval(function () {
+    var c = document.getElementById("mynetwork");
+    if (c && c.offsetWidth > 0 && c.offsetHeight > 0) {
+      fitIt();
+      tries++;
+      if (tries > 3) { clearInterval(timer); }
+    }
+  }, 400);
+  window.addEventListener("resize", fitIt);
+})();
+</script>
+"""
+                    html_data = html_data.replace("</body>", fit_js + "</body>")
                     components.html(html_data, height=520)
                 except Exception as e:
                     st.error(f"Could not generate graph: {e}")
