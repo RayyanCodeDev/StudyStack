@@ -121,7 +121,14 @@ def _ask(prompt):
     try:
         response = get_client().models.generate_content(model=MODEL, contents=prompt)
         text = (response.text or "").strip()
-        return text or "⚠️ The AI sent back an empty answer. Please try again."
+        if text:
+            return text
+        reason = ""
+        try:
+            reason = str(response.candidates[0].finish_reason)
+        except Exception:
+            pass
+        return f"⚠️ The AI sent back an empty answer ({reason or 'no reason given'}). Please try again."
     except Exception as e:
         return friendly_error(e)
 
