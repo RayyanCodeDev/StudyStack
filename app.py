@@ -1499,7 +1499,7 @@ with tab_chat:
                         except Exception as e:
                             st.warning(f"Reply shown, but saving failed: {e}")
 
-                with history_box:
+                     with history_box:
                 # --- SCROLLABLE CHAT HISTORY ---
                 with st.container(height=450):
                     for m in st.session_state.chat_history:
