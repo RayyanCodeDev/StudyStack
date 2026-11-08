@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
@@ -189,19 +190,30 @@ How to answer:
 6. Match the length to the question: short for simple questions, more detailed for "explain" requests.
    Use short paragraphs, and bullet points only when they genuinely help.
 7. Be warm, clear and encouraging. If you are not sure about a fact, say so instead of guessing.
-8. {_lang_rule(language)}
+8. {_lang_rule(_resolve_language(language, question))}
 9. Finish with one last line on its own: "Source: From your notes", "Source: General knowledge" or "Source: Notes + general knowledge", whichever is true.""")
+URDU_SCRIPT = re.compile(r"[\u0600-\u06FF]")
+
+
+def _resolve_language(language, *texts):
+    """In Auto mode, a message written in Urdu script gets an Urdu-script reply."""
+    if language == "Auto" and any(URDU_SCRIPT.search(str(t or "")) for t in texts):
+        return "Urdu"
+    return language
+
 def _lang_rule(language):
+    urdu_words = ("Use everyday Urdu vocabulary, with Persian and Arabic-origin words (for example dimagh, hissa, kaam, "
+                  "zaroori, wazahat). Do NOT use Sanskrit or Hindi words such as mukhya, sthit, prakriya or sambandh.")
     if language == "Roman Urdu":
-        return "Reply in Roman Urdu (Urdu written in English letters). Keep technical terms in English."
+        return ("Reply in Roman Urdu (Urdu written in English letters). Keep technical terms in English. " + urdu_words)
     if language == "Urdu":
-        return "Reply in Urdu script. Keep technical terms in English."
+        return ("Reply in Urdu script (اردو), written right to left, never in English letters. "
+                "Keep technical terms in English. " + urdu_words)
     if language == "English":
         return "Reply in English."
-        return ("Reply in the language of the student's own latest messages (their question and attempt). "
-            "Ignore the language of earlier tutor replies. If the student wrote in English, or only wrote something "
-            "like 'idk', reply in English. Use Roman Urdu only if the student themselves wrote Roman Urdu, "
-            "and Urdu script only if they wrote Urdu script.")
+    return ("Reply in the language of the student's own latest messages (their question and attempt). "
+            "Ignore the language of earlier tutor replies. If the student wrote in English, or only something "
+            "like 'idk', reply in English. Use Roman Urdu only if the student themselves wrote Roman Urdu. " + urdu_words)
 
 HINT_RULES = {
     1: "LEVEL 1, NUDGE: React to the student's attempt. Say what is right, point to what to rethink, and ask ONE guiding question. Do NOT give the answer.",
@@ -245,7 +257,7 @@ Other rules:
 - If the attempt is already correct, say so and ask one deeper "why" question instead.
 - Use the material when it is relevant, but you may use general knowledge too.
 - Do not greet the student.
-- {_lang_rule(language)}
+- {_lang_rule(_resolve_language(language, question, attempt))}
 - Finish with one last line on its own: "Source: From your notes", "Source: General knowledge" or "Source: Notes + general knowledge", whichever is true.""")
 def make_distractors(cards):
     """cards: list of {"front", "back"}. Returns {card_index: [3 wrong answers]}; {} on any failure."""
