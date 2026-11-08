@@ -1476,7 +1476,7 @@ with tab_chat:
                             st.session_state.voice_gen += 1
                             st.rerun()
 
-                history_box = st.container()
+                history_box = st.container(height=450)
                 lang = st.selectbox("Tutor language", ["Auto", "English", "Roman Urdu", "Urdu"], key="tutor_lang")
                 think_first = st.toggle("🧠 Think-First mode: try it yourself before the tutor explains",
                                         value=True, key="think_first")
