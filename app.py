@@ -347,74 +347,36 @@ THEMES = {
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
-:root{--text:__TEXT__;--muted:__MUTED__;--glass:__GLASS__;--glass2:__GLASS2__;--border:__BORDER__;--shadow:__SHADOW__;--glow:__GLOW__;--input-bg:__INPUT_BG__;}
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
+:root{--text:__TEXT__;--muted:__MUTED__;--glass:__GLASS__;--glass2:__GLASS2__;--border:__BORDER__;--base:__BASE__;}
 #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"]{visibility:hidden;}
 header[data-testid="stHeader"]{background:transparent;}
 
 .stApp{
-  background:
-    radial-gradient(circle at 12% 18%, __O1__ 0, transparent 38%),
-    radial-gradient(circle at 88% 8%,  __O2__ 0, transparent 36%),
-    radial-gradient(circle at 70% 92%, __O3__ 0, transparent 40%),
-    __BASE__;
-  background-attachment:fixed;
-  font-family:'Plus Jakarta Sans',sans-serif;
+    background:
+        radial-gradient(circle at 12% 18%, __01__ 0, transparent 38%),
+        radial-gradient(circle at 88% 8%, __02__ 0, transparent 36%),
+        radial-gradient(circle at 70% 92%, __03__ 0, transparent 40%),
+        __BASE__;
+    background-attachment:fixed;
+    font-family: 'Plus Jakarta Sans', sans-serif;
 }
 .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp p,.stApp li,.stApp label,.stApp summary,
-.stApp [data-testid="stMarkdownContainer"],.stApp [data-testid="stCaptionContainer"]{color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;}
-.stApp h1{font-weight:800;letter-spacing:-0.02em;}
-[data-testid="stMetric"] *{color:var(--text)!important;}
+.stApp [data-testid="stMarkdownContainer"],.stApp [data-testid="stCaptionContainer"]{color:var(--text) !important;}
 
-[class*="st-key-card"]{
-  background:linear-gradient(145deg,var(--glass2),var(--glass));
-  backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);
-  border:1px solid var(--border)!important;border-radius:24px!important;
-  box-shadow:var(--shadow),0 0 0 1px var(--glow),inset 0 1px 0 rgba(255,255,255,0.35);
-  padding:1.4rem 1.6rem!important;margin-bottom:1.1rem;
-}
-
-.stTabs [data-baseweb="tab-list"]{gap:8px;padding:6px;background:var(--glass);border:1px solid var(--border);
-  border-radius:999px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow);width:fit-content;max-width:100%;overflow-x:auto;}
-.stTabs [data-baseweb="tab"]{background:transparent;border-radius:999px;padding:8px 18px;height:auto;}
-.stTabs [data-baseweb="tab"] p{color:var(--muted);font-weight:600;}
-.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#7c5cff,#00c8ff)!important;box-shadow:0 0 22px var(--glow);}
-.stTabs [aria-selected="true"] p{color:#fff!important;}
-.stTabs [data-baseweb="tab-highlight"],.stTabs [data-baseweb="tab-border"]{display:none;}
-
-[data-testid="stExpander"]{background:var(--glass);border:1px solid var(--border)!important;border-radius:16px!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-[data-testid="stExpander"] summary{font-weight:600;}
-
-.stTextArea textarea, .stTextInput input, .stNumberInput input, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
-    background: var(--input-bg) !important;
+/* --- FIX FOR DARK MODE ALERT & FEEDBACK BOXES --- */
+.stAlert, .stSuccess, .stError, .stInfo, .stWarning, 
+[data-testid="stNotification"], [data-testid="stAlert"] {
     color: var(--text) !important;
-    -webkit-text-fill-color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 14px !important;
-    caret-color: var(--text) !important;
 }
-
-.stTextArea textarea::placeholder, .stTextInput input::placeholder {
-    color: var(--muted) !important;
-    -webkit-text-fill-color: var(--muted) !important;
-    opacity: 0.7 !important;
+.stAlert p, .stSuccess p, .stError p, .stInfo p, .stWarning p,
+[data-testid="stNotification"] p, [data-testid="stAlert"] p {
+    color: var(--text) !important;
 }
-[data-testid="stFileUploaderDropzone"]{background:var(--glass2);border:1.5px dashed var(--border);border-radius:18px;}
-[data-testid="stFileUploaderDropzone"] *{color:var(--text)!important;}
-[data-testid="stAlert"]{background:var(--glass2);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(14px);}
-.stButton>button,.stDownloadButton>button,[data-testid="stDownloadButton"]>button,[data-testid="stFormSubmitButton"]>button{background:linear-gradient(135deg,#7c5cff,#00c8ff);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:700;box-shadow:0 0 22px var(--glow);white-space:nowrap;}
-.stButton>button:hover,.stDownloadButton>button:hover,[data-testid="stDownloadButton"]>button:hover,[data-testid="stFormSubmitButton"]>button:hover{filter:brightness(1.12);color:#fff;}
-
-.st-key-dark_mode *{white-space:nowrap;}
-.st-key-card_login [data-testid="stImage"]{display:flex;justify-content:center;}
-
-[data-testid="stForm"]{border:none!important;padding:0!important;background:transparent!important;}
-[data-testid="stChatMessage"]{background:var(--glass);border:1px solid var(--border);border-radius:18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
-
-[data-testid="stGraphVizChart"]{display:flex;justify-content:center;}
-[data-testid="stGraphVizChart"] svg{margin:0 auto;max-width:100%;height:auto;}
 </style>
 """
+
+
 css = CSS
 for k, v in THEMES[dark].items():
     css = css.replace(f"__{k}__", v)
