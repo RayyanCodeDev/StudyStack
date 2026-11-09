@@ -376,7 +376,6 @@ header[data-testid="stHeader"]{background:transparent;}
 </style>
 """
 
-
 css = CSS
 for k, v in THEMES[dark].items():
     css = css.replace(f"__{k}__", v)
