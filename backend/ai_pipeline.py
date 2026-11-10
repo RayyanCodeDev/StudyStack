@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import re
 from dotenv import load_dotenv
 from google import genai
@@ -38,9 +39,27 @@ def get_client():
         _client = genai.Client(api_key=key)
     return _client
 
+def _generate(**kwargs):
+    """Call Gemini and retry a couple of times when the server is busy (500, 503, 504)."""
+    last = None
+    for attempt in range(3):
+        try:
+            return get_client().models.generate_content(**kwargs)
+        except (errors.ServerError, errors.ClientError) as e:
+            if getattr(e, "code", None) not in (500, 503, 504):
+                raise
+            last = e
+            time.sleep(2 * (attempt + 1))
+    raise last
 
 def friendly_error(e):
     """Turn an API exception into a short message a student can read."""
+    
+    # --- ADDED THIS BLOCK ---
+    if isinstance(e, errors.ServerError) or getattr(e, "code", None) in (500, 503, 504):
+        return "⚠️ Gemini is busy right now (high demand). Please wait a moment and try again."
+    # ------------------------
+
     if isinstance(e, errors.ClientError):
         code = getattr(e, "code", None)
         if code == 429:
@@ -51,6 +70,7 @@ def friendly_error(e):
         if code in (401, 403):
             return "⚠️ Gemini rejected the API key. Check GEMINI_API_KEY in Secrets."
         return f"⚠️ Gemini returned an error ({code}): {getattr(e, 'message', e)}"
+        
     return f"⚠️ Something went wrong: {e}"
 
 
@@ -89,7 +109,7 @@ PDF_PROMPT = (
 def _run(prompt, part):
     """Send a prompt plus one file (image or PDF part) to Gemini and parse the JSON reply."""
     try:
-        response = get_client().models.generate_content(
+        response = _generate(
             model=MODEL,
             contents=[prompt, part],
             config=types.GenerateContentConfig(response_mime_type="application/json"),
@@ -120,7 +140,7 @@ def analyze_pdf(pdf_bytes):
 
 def _ask(prompt):
     try:
-        response = get_client().models.generate_content(model=MODEL, contents=prompt)
+        response = _generate(model=MODEL, contents=prompt)
         text = (response.text or "").strip()
         if text:
             return text
@@ -280,7 +300,7 @@ Items:
 {json.dumps(items, ensure_ascii=False)}
 """
     try:
-        response = get_client().models.generate_content(
+        response = _generate(
             model=MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json"),
