@@ -427,6 +427,8 @@ input,textarea{color:var(--text)!important;-webkit-text-fill-color:var(--text)!i
 [data-baseweb="popover"] li,[data-baseweb="menu"] li{color:var(--text)!important;}
 [data-baseweb="textarea"],[data-baseweb="base-input"],[data-testid="stTextAreaRootElement"]{background:var(--input-bg)!important;}
 [data-testid="stRadio"] p,[data-testid="stRadio"] label,[data-testid="stToggle"] p,[data-testid="stCheckbox"] p{color:var(--text)!important;}
+[data-testid="stIconMaterial"],.material-symbols-rounded,.material-icons{font-family:"Material Symbols Rounded","Material Symbols Outlined",sans-serif!important;-webkit-text-fill-color:currentColor!important;}
+[data-baseweb="base-input"] button{background:transparent!important;color:var(--text)!important;}
 </style>
 """
 
