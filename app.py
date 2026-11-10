@@ -335,13 +335,13 @@ THEMES = {
         TEXT="#f2f5ff", MUTED="#aab4d4", GLASS="rgba(255,255,255,0.07)", GLASS2="rgba(255,255,255,0.10)",
         BORDER="rgba(255,255,255,0.20)", SHADOW="0 10px 40px rgba(0,0,0,0.45)", GLOW="rgba(124,140,255,0.35)",
         BASE="#080b1a", O1="rgba(124,92,255,0.55)", O2="rgba(0,200,255,0.40)", O3="rgba(255,90,140,0.40)",
-        INPUT_BG="#1a1c29",
+        INPUT_BG="#1a1c29", SCHEME="dark",
     ),
     False: dict(
         TEXT="#14182b", MUTED="#4a5273", GLASS="rgba(255,255,255,0.55)", GLASS2="rgba(255,255,255,0.75)",
         BORDER="rgba(255,255,255,0.95)", SHADOW="0 10px 40px rgba(70,80,160,0.20)", GLOW="rgba(124,140,255,0.45)",
         BASE="#e9eeff", O1="rgba(150,120,255,0.55)", O2="rgba(80,200,255,0.50)", O3="rgba(255,150,180,0.50)",
-        INPUT_BG="#ffffff",
+        INPUT_BG="#ffffff", SCHEME="light",
     ),
 }
 
@@ -418,6 +418,15 @@ header[data-testid="stHeader"]{background:transparent;}
 
 [data-testid="stGraphVizChart"]{display:flex;justify-content:center;}
 [data-testid="stGraphVizChart"] svg{margin:0 auto;max-width:100%;height:auto;}
+:root,.stApp,[data-testid="stAppViewContainer"]{color-scheme:__SCHEME__;}
+input,textarea{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;}
+[data-baseweb="select"]>div{background:var(--input-bg)!important;border:1px solid var(--border)!important;border-radius:14px!important;}
+[data-baseweb="select"] *{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;}
+[data-baseweb="select"] svg{fill:var(--text)!important;}
+[data-baseweb="popover"] ul,[data-baseweb="menu"]{background:var(--input-bg)!important;}
+[data-baseweb="popover"] li,[data-baseweb="menu"] li{color:var(--text)!important;}
+[data-baseweb="textarea"],[data-baseweb="base-input"],[data-testid="stTextAreaRootElement"]{background:var(--input-bg)!important;}
+[data-testid="stRadio"] p,[data-testid="stRadio"] label,[data-testid="stToggle"] p,[data-testid="stCheckbox"] p{color:var(--text)!important;}
 </style>
 """
 
