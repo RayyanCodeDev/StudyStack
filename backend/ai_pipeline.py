@@ -39,17 +39,23 @@ def get_client():
         _client = genai.Client(api_key=key)
     return _client
 
+FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "")
+
+
 def _generate(**kwargs):
-    """Call Gemini and retry a couple of times when the server is busy (500, 503, 504)."""
+    """Retry when Gemini is busy, then try a backup model if one is set."""
+    models = [kwargs.get("model", MODEL)] + ([FALLBACK_MODEL] if FALLBACK_MODEL else [])
     last = None
-    for attempt in range(3):
-        try:
-            return get_client().models.generate_content(**kwargs)
-        except (errors.ServerError, errors.ClientError) as e:
-            if getattr(e, "code", None) not in (500, 503, 504):
-                raise
-            last = e
-            time.sleep(2 * (attempt + 1))
+    for m in models:
+        kwargs["model"] = m
+        for attempt in range(3):
+            try:
+                return get_client().models.generate_content(**kwargs)
+            except (errors.ServerError, errors.ClientError) as e:
+                if getattr(e, "code", None) not in (500, 503, 504):
+                    raise
+                last = e
+                time.sleep(2 * (attempt + 1))
     raise last
 
 def friendly_error(e):
