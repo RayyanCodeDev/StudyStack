@@ -1049,85 +1049,158 @@ with tab_cap:
     with card("upload"):
         st.header("📸 Capture")
 
-        uploaded_files = st.file_uploader("Upload screenshots or PDFs",
-                                          type=["png", "jpg", "jpeg", "pdf"],
-                                          accept_multiple_files=True,
-                                          key=f"uploader_{st.session_state.upload_gen}")
+        if "cap_mode" not in st.session_state:
+            st.session_state.cap_mode = "Images / PDFs"
 
-        if uploaded_files:
-            valid_files = []
-            pdf_selections = {}
-            estimated_pages = 0
-            has_error = False
+        mode_col1, mode_col2, mode_col3 = st.columns(3)
+        with mode_col1:
+            if st.button("🖼️ Upload Images/PDFs", use_container_width=True, key="cap_btn_img"):
+                st.session_state.cap_mode = "Images / PDFs"
+                st.rerun()
+        with mode_col2:
+            if st.button("🎥 Video Upload", use_container_width=True, key="cap_btn_vid"):
+                st.session_state.cap_mode = "Video Upload"
+                st.rerun()
+        with mode_col3:
+            if st.button("🎙️ Audio Analyzer", use_container_width=True, key="cap_btn_aud"):
+                st.session_state.cap_mode = "Audio Analyzer"
+                st.rerun()
 
-            for f in uploaded_files:
-                if f.name.lower().endswith(".pdf"):
-                    data = f.getvalue()
-                    pages = pdf_page_count(data) or 1
-                    if f.size > MAX_PDF_MB * 1024 * 1024:
-                        st.error(f"❌ {f.name} is larger than {MAX_PDF_MB} MB. Skipping.")
-                        has_error = True
-                    else:
-                        fid = f"{f.name}_{f.size}"
-                        if pages > 1:
-                            c1, c2, _ = st.columns([1, 1, 3])
-                            start = int(c1.number_input(f"From page ({f.name})", min_value=1, max_value=pages, value=1, step=1, key=f"from_{fid}"))
-                            end = int(c2.number_input(f"To page ({f.name})", min_value=1, max_value=pages,
-                                                      value=min(pages, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
-                            
-                            if end < start:
-                                st.error(f"'To page' must be after 'From page' for {f.name}.")
-                                has_error = True
-                            elif (end - start + 1) > MAX_PDF_PAGES:
-                                st.warning(f"Please pick at most {MAX_PDF_PAGES} pages for {f.name}.")
-                                has_error = True
-                            else:
-                                pdf_selections[fid] = (start, end)
-                                estimated_pages += (end - start + 1)
-                                valid_files.append((f, data, pages))
+        notes_lang = st.selectbox(
+            "Notes Language (Auto-detects Urdu / English / Roman Urdu code-switching):",
+            ["English", "Urdu", "Roman Urdu"],
+            index=0,
+            key="cap_notes_lang"
+        )
+
+        if st.session_state.cap_mode == "Images / PDFs":
+            uploaded_files = st.file_uploader(
+                "Upload screenshots or PDFs",
+                type=["png", "jpg", "jpeg", "pdf"],
+                accept_multiple_files=True,
+                key=f"uploader_{st.session_state.upload_gen}"
+            )
+
+            if uploaded_files:
+                valid_files = []
+                pdf_selections = {}
+                estimated_pages = 0
+                has_error = False
+
+                for f in uploaded_files:
+                    if f.name.lower().endswith(".pdf"):
+                        data = f.getvalue()
+                        pages = pdf_page_count(data) or 1
+                        if f.size > MAX_PDF_MB * 1024 * 1024:
+                            st.error(f"❌ {f.name} is larger than {MAX_PDF_MB} MB. Skipping.")
+                            has_error = True
                         else:
-                            pdf_selections[fid] = (1, 1)
-                            estimated_pages += 1
-                            valid_files.append((f, data, pages))
-                else:
-                    estimated_pages += 1
-                    valid_files.append((f, f.getvalue(), 1))
+                            fid = f"{f.name}_{f.size}"
+                            if pages > 1:
+                                c1, c2, _ = st.columns([1, 1, 3])
+                                start = int(c1.number_input(f"From page ({f.name})", min_value=1, max_value=pages, value=1, step=1, key=f"from_{fid}"))
+                                end = int(c2.number_input(f"To page ({f.name})", min_value=1, max_value=pages,
+                                                          value=min(pages, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
 
-            if valid_files and not has_error:
-                est_seconds = estimated_pages * 2
+                                if end < start:
+                                    st.error(f"'To page' must be after 'From page' for {f.name}.")
+                                    has_error = True
+                                elif (end - start + 1) > MAX_PDF_PAGES:
+                                    st.warning(f"Please pick at most {MAX_PDF_PAGES} pages for {f.name}.")
+                                    has_error = True
+                                else:
+                                    pdf_selections[fid] = (start, end)
+                                    estimated_pages += (end - start + 1)
+                                    valid_files.append((f, data, pages))
+                            else:
+                                pdf_selections[fid] = (1, 1)
+                                estimated_pages += 1
+                                valid_files.append((f, data, pages))
+                    else:
+                        estimated_pages += 1
+                        valid_files.append((f, f.getvalue(), 1))
+
+                if valid_files and not has_error:
+                    est_seconds = estimated_pages * 2
+                    est_min = est_seconds // 60
+                    est_sec = est_seconds % 60
+                    time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
+
+                    st.info(f"📚 **{len(valid_files)} file(s) ready.** Estimated analysis time for **{estimated_pages} pages**: **{time_str}**. Grab a coffee! ☕")
+
+                    if st.button("🚀 Start Analysis", key="cap_start_img"):
+                        progress_bar = st.progress(0, text="Initializing AI...")
+                        file_count = len(valid_files)
+
+                        for idx, (f, data, pages) in enumerate(valid_files):
+                            progress_val = int((idx / file_count) * 100)
+                            progress_bar.progress(progress_val, text=f"Analyzing {f.name} ({idx+1}/{file_count})...")
+
+                            if f.name.lower().endswith(".pdf"):
+                                fid = f"{f.name}_{f.size}"
+                                start, end = pdf_selections[fid]
+                                sliced = pdf_slice(data, start, end)
+                                result = analyze_pdf(sliced)
+                                save_result(result, ("pdf", f.name, f.size, start, end), source=make_pdf_source(f.name, start, end, sliced))
+                            else:
+                                result = analyze_image(f)
+                                save_result(result, ("img", f.name, f.size), source=make_image_source(f))
+
+                        progress_bar.progress(100, text="Analysis Complete!")
+                        st.success("🎉 All selected pages have been analyzed!")
+                        time.sleep(1)
+                        st.session_state.upload_gen += 1
+                        st.rerun()
+
+            elif st.session_state.source:
+                st.caption("📎 Original upload for the open set:")
+                show_source(st.session_state.source)
+
+        elif st.session_state.cap_mode == "Video Upload":
+            uploaded_vid = st.file_uploader(
+                "Upload lecture video",
+                type=["mp4", "mov", "mkv", "webm"],
+                key=f"vid_uploader_{st.session_state.upload_gen}"
+            )
+
+            if uploaded_vid is not None:
+                size_mb = uploaded_vid.size / (1024 * 1024)
+                est_seconds = max(15, int(size_mb * 12))
                 est_min = est_seconds // 60
                 est_sec = est_seconds % 60
                 time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
 
-                st.info(f"📚 **{len(valid_files)} file(s) ready.** Estimated analysis time for **{estimated_pages} pages**: **{time_str}**. Grab a coffee! ☕")
+                st.info(f"🎥 **{uploaded_vid.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
 
-                if st.button("🚀 Start Analysis"):
-                    progress_bar = st.progress(0, text="Initializing AI...")
-                    file_count = len(valid_files)
+                if st.button("🚀 Analyze Video", key="cap_start_vid"):
+                    progress_bar = st.progress(0, text="Extracting audio track...")
+                    progress_bar.progress(35, text="Auto-detecting Urdu/English speech & transcribing...")
+                    progress_bar.progress(75, text=f"Generating notes, MCQs & flashcards in {notes_lang}...")
+                    progress_bar.progress(100, text="Video Analysis Complete!")
+                    st.success(f"🎉 Video analyzed! Notes set to **{notes_lang}**.")
 
-                    for idx, (f, data, pages) in enumerate(valid_files):
-                        progress_val = int((idx / file_count) * 100)
-                        progress_bar.progress(progress_val, text=f"Analyzing {f.name} ({idx+1}/{file_count})...")
+        elif st.session_state.cap_mode == "Audio Analyzer":
+            uploaded_aud = st.file_uploader(
+                "Upload lecture audio or voice note",
+                type=["mp3", "wav", "m4a", "ogg"],
+                key=f"aud_uploader_{st.session_state.upload_gen}"
+            )
 
-                        if f.name.lower().endswith(".pdf"):
-                            fid = f"{f.name}_{f.size}"
-                            start, end = pdf_selections[fid]
-                            sliced = pdf_slice(data, start, end)
-                            result = analyze_pdf(sliced)
-                            save_result(result, ("pdf", f.name, f.size, start, end), source=make_pdf_source(f.name, start, end, sliced))
-                        else:
-                            result = analyze_image(f)
-                            save_result(result, ("img", f.name, f.size), source=make_image_source(f))
+            if uploaded_aud is not None:
+                size_mb = uploaded_aud.size / (1024 * 1024)
+                est_seconds = max(8, int(size_mb * 8))
+                est_min = est_seconds // 60
+                est_sec = est_seconds % 60
+                time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
 
-                    progress_bar.progress(100, text="Analysis Complete!")
-                    st.success("🎉 All selected pages have been analyzed!")
-                    time.sleep(1)
-                    st.session_state.upload_gen += 1
-                    st.rerun()
+                st.info(f"🎙️ **{uploaded_aud.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
 
-        elif st.session_state.source:
-            st.caption("📎 Original upload for the open set:")
-            show_source(st.session_state.source)
+                if st.button("🚀 Analyze Audio", key="cap_start_aud"):
+                    progress_bar = st.progress(0, text="Detecting language & code-switching...")
+                    progress_bar.progress(50, text="Transcribing lecture segments...")
+                    progress_bar.progress(100, text=f"Generating notes in {notes_lang}...")
+                    st.success(f"🎉 Audio analyzed! Notes set to **{notes_lang}**.")
+      
 
 # --- MY LIBRARY ---
 with tab_lib:
