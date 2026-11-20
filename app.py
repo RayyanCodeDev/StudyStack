@@ -1045,6 +1045,8 @@ with tab_home:
                     "keep your streak and compete with friends.")
 
 # --- CAPTURE ---
+MAX_MEDIA_MB = 100  # Adjust to match your backend/API upload limit
+
 with tab_cap:
     with card("upload"):
         st.header("📸 Capture")
@@ -1054,15 +1056,33 @@ with tab_cap:
 
         mode_col1, mode_col2, mode_col3 = st.columns(3)
         with mode_col1:
-            if st.button("🖼️ Upload Images/PDFs", use_container_width=True, key="cap_btn_img"):
+            is_img = st.session_state.cap_mode == "Images / PDFs"
+            if st.button(
+                "🖼️ Upload Images/PDFs",
+                use_container_width=True,
+                type="primary" if is_img else "secondary",
+                key="cap_btn_img"
+            ):
                 st.session_state.cap_mode = "Images / PDFs"
                 st.rerun()
         with mode_col2:
-            if st.button("🎥 Video Upload", use_container_width=True, key="cap_btn_vid"):
+            is_vid = st.session_state.cap_mode == "Video Upload"
+            if st.button(
+                "🎥 Video Upload",
+                use_container_width=True,
+                type="primary" if is_vid else "secondary",
+                key="cap_btn_vid"
+            ):
                 st.session_state.cap_mode = "Video Upload"
                 st.rerun()
         with mode_col3:
-            if st.button("🎙️ Audio Analyzer", use_container_width=True, key="cap_btn_aud"):
+            is_aud = st.session_state.cap_mode == "Audio Analyzer"
+            if st.button(
+                "🎙️ Audio Analyzer",
+                use_container_width=True,
+                type="primary" if is_aud else "secondary",
+                key="cap_btn_aud"
+            ):
                 st.session_state.cap_mode = "Audio Analyzer"
                 st.rerun()
 
@@ -1098,9 +1118,17 @@ with tab_cap:
                             fid = f"{f.name}_{f.size}"
                             if pages > 1:
                                 c1, c2, _ = st.columns([1, 1, 3])
-                                start = int(c1.number_input(f"From page ({f.name})", min_value=1, max_value=pages, value=1, step=1, key=f"from_{fid}"))
-                                end = int(c2.number_input(f"To page ({f.name})", min_value=1, max_value=pages,
-                                                          value=min(pages, MAX_PDF_PAGES), step=1, key=f"to_{fid}"))
+                                start = int(c1.number_input(
+                                    f"From page ({f.name})",
+                                    min_value=1, max_value=pages, value=1, step=1,
+                                    key=f"from_{fid}"
+                                ))
+                                end = int(c2.number_input(
+                                    f"To page ({f.name})",
+                                    min_value=1, max_value=pages,
+                                    value=min(pages, MAX_PDF_PAGES), step=1,
+                                    key=f"to_{fid}"
+                                ))
 
                                 if end < start:
                                     st.error(f"'To page' must be after 'From page' for {f.name}.")
@@ -1140,10 +1168,10 @@ with tab_cap:
                                 fid = f"{f.name}_{f.size}"
                                 start, end = pdf_selections[fid]
                                 sliced = pdf_slice(data, start, end)
-                                result = analyze_pdf(sliced)
+                                result = analyze_pdf(sliced, lang=notes_lang)
                                 save_result(result, ("pdf", f.name, f.size, start, end), source=make_pdf_source(f.name, start, end, sliced))
                             else:
-                                result = analyze_image(f)
+                                result = analyze_image(f, lang=notes_lang)
                                 save_result(result, ("img", f.name, f.size), source=make_image_source(f))
 
                         progress_bar.progress(100, text="Analysis Complete!")
@@ -1165,19 +1193,29 @@ with tab_cap:
 
             if uploaded_vid is not None:
                 size_mb = uploaded_vid.size / (1024 * 1024)
-                est_seconds = max(15, int(size_mb * 12))
-                est_min = est_seconds // 60
-                est_sec = est_seconds % 60
-                time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
+                if size_mb > MAX_MEDIA_MB:
+                    st.error(f"❌ {uploaded_vid.name} ({size_mb:.1f} MB) exceeds the {MAX_MEDIA_MB} MB limit.")
+                else:
+                    est_seconds = max(15, int(size_mb * 12))
+                    est_min = est_seconds // 60
+                    est_sec = est_seconds % 60
+                    time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
 
-                st.info(f"🎥 **{uploaded_vid.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
+                    st.info(f"🎥 **{uploaded_vid.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
 
-                if st.button("🚀 Analyze Video", key="cap_start_vid"):
-                    progress_bar = st.progress(0, text="Extracting audio track...")
-                    progress_bar.progress(35, text="Auto-detecting Urdu/English speech & transcribing...")
-                    progress_bar.progress(75, text=f"Generating notes, MCQs & flashcards in {notes_lang}...")
-                    progress_bar.progress(100, text="Video Analysis Complete!")
-                    st.success(f"🎉 Video analyzed! Notes set to **{notes_lang}**.")
+                    if st.button("🚀 Analyze Video", key="cap_start_vid"):
+                        progress_bar = st.progress(0, text="Extracting audio track...")
+                        progress_bar.progress(35, text="Auto-detecting Urdu/English speech & transcribing...")
+                        progress_bar.progress(75, text=f"Generating notes, MCQs & flashcards in {notes_lang}...")
+                        
+                        result = analyze_video(uploaded_vid, lang=notes_lang)
+                        save_result(result, ("vid", uploaded_vid.name, uploaded_vid.size), source=None)
+                        
+                        progress_bar.progress(100, text="Video Analysis Complete!")
+                        st.success(f"🎉 Video analyzed! Notes set to **{notes_lang}**.")
+                        time.sleep(1)
+                        st.session_state.upload_gen += 1
+                        st.rerun()
 
         elif st.session_state.cap_mode == "Audio Analyzer":
             uploaded_aud = st.file_uploader(
@@ -1188,18 +1226,23 @@ with tab_cap:
 
             if uploaded_aud is not None:
                 size_mb = uploaded_aud.size / (1024 * 1024)
-                est_seconds = max(8, int(size_mb * 8))
-                est_min = est_seconds // 60
-                est_sec = est_seconds % 60
-                time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
+                if size_mb > MAX_MEDIA_MB:
+                    st.error(f"❌ {uploaded_aud.name} ({size_mb:.1f} MB) exceeds the {MAX_MEDIA_MB} MB limit.")
+                else:
+                    est_seconds = max(8, int(size_mb * 8))
+                    est_min = est_seconds // 60
+                    est_sec = est_seconds % 60
+                    time_str = f"{est_min} mins {est_sec} secs" if est_min > 0 else f"{est_sec} seconds"
 
-                st.info(f"🎙️ **{uploaded_aud.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
+                    st.info(f"🎙️ **{uploaded_aud.name}** ({size_mb:.1f} MB) • Estimated analysis time: **{time_str}**")
 
-                if st.button("🚀 Analyze Audio", key="cap_start_aud"):
-                    progress_bar = st.progress(0, text="Detecting language & code-switching...")
-                    progress_bar.progress(50, text="Transcribing lecture segments...")
-                    progress_bar.progress(100, text=f"Generating notes in {notes_lang}...")
-                    st.success(f"🎉 Audio analyzed! Notes set to **{notes_lang}**.")
+                    if st.button("🚀 Analyze Audio", key="cap_start_aud"):
+                        progress_bar = st.progress(0, text="Detecting language & code-switching...")
+                        progress_bar.progress(50, text="Transcribing lecture segments...")
+                        progress_bar.progress(75, text=f"Generating notes in {notes_lang}...")
+                        
+                        result = analyze_audio(uploaded_aud, lang=notes_lang)
+                        save_result(result, ("aud", uploaded_aud.name, uploaded_aud.size), source=None)
       
 
 # --- MY LIBRARY ---
